@@ -1,23 +1,41 @@
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { createEntry } from '../lib/entries'
+import { uploadPhoto } from '../lib/storage'
+import PageShell from '../components/PageShell'
+import EntryForm from '../components/EntryForm'
 
 function Add() {
+  const navigate = useNavigate()
+
+  async function handleSubmit(formData) {
+    let photoUrl = null
+
+    if (formData.photoFile) {
+      const { url, error: uploadError } = await uploadPhoto(formData.photoFile)
+      if (uploadError) throw uploadError
+      photoUrl = url
+    }
+
+    const { error } = await createEntry({
+      dish_name: formData.dishName,
+      venue_name: formData.venueName || null,
+      entry_type: formData.entryType,
+      cost: formData.cost,
+      companions: formData.companions || null,
+      rating: formData.rating,
+      notes: formData.notes || null,
+      ate_at: formData.ateAt,
+      photo_url: photoUrl,
+    })
+
+    if (error) throw error
+    navigate('/')
+  }
+
   return (
-    <div className="min-h-screen bg-stone-50">
-      <div className="max-w-md mx-auto px-4 py-12">
-        <Link
-          to="/"
-          className="text-stone-400 hover:text-stone-600 transition-colors text-sm"
-        >
-          &larr; Back
-        </Link>
-        <h1 className="text-2xl font-bold text-stone-900 mt-4 mb-2">
-          Log a meal
-        </h1>
-        <p className="text-stone-500">
-          This is where you'll add food entries. Coming in Phase 1.
-        </p>
-      </div>
-    </div>
+    <PageShell title="Log a meal" backTo="/">
+      <EntryForm onSubmit={handleSubmit} submitLabel="Save entry" />
+    </PageShell>
   )
 }
 

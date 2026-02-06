@@ -1,23 +1,24 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { getEntries } from '../lib/entries'
+import EntryCard from '../components/EntryCard'
 
 function Home() {
-  const [testMessage, setTestMessage] = useState(null)
+  const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    async function fetchTest() {
-      const { data, error } = await supabase.from('test').select('*').limit(1)
+    async function fetchEntries() {
+      const { data, error } = await getEntries()
       if (error) {
         setError(error.message)
-      } else if (data && data.length > 0) {
-        setTestMessage(data[0].message)
+      } else {
+        setEntries(data || [])
       }
       setLoading(false)
     }
-    fetchTest()
+    fetchEntries()
   }, [])
 
   return (
@@ -35,18 +36,21 @@ function Home() {
           + Log a meal
         </Link>
 
-        <div className="mt-12 p-4 rounded-lg bg-white border border-stone-200">
-          <p className="text-sm font-medium text-stone-400 mb-1">Supabase connection</p>
-          {loading && <p className="text-stone-500">Connecting...</p>}
-          {error && <p className="text-red-500">{error}</p>}
-          {testMessage && (
-            <p className="text-green-600 font-medium">{testMessage}</p>
+        <div className="mt-8 space-y-3">
+          {loading && (
+            <p className="text-stone-400 text-center py-8">Loading...</p>
           )}
-          {!loading && !error && !testMessage && (
-            <p className="text-amber-500">
-              No test table found. Create it in Supabase to verify the connection.
+          {error && (
+            <p className="text-red-500 text-center py-8">{error}</p>
+          )}
+          {!loading && !error && entries.length === 0 && (
+            <p className="text-stone-400 text-center py-8">
+              No meals logged yet. Tap above to add your first!
             </p>
           )}
+          {entries.map((entry) => (
+            <EntryCard key={entry.id} entry={entry} />
+          ))}
         </div>
       </div>
     </div>
