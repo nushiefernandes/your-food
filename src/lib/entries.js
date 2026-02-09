@@ -16,9 +16,10 @@ export async function getEntry(id) {
 }
 
 export async function createEntry(entryData) {
+  const { data: { user } } = await supabase.auth.getUser()
   return supabase
     .from('entries')
-    .insert(entryData)
+    .insert({ ...entryData, user_id: user.id })
     .select()
     .single()
 }

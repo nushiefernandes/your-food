@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { getEntries } from '../lib/entries'
+import { useAuth } from '../contexts/AuthContext'
 import EntryCard from '../components/EntryCard'
 
 function Home() {
+  const { user, signOut } = useAuth()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -24,6 +26,17 @@ function Home() {
   return (
     <div className="min-h-screen bg-stone-50">
       <div className="max-w-md mx-auto px-4 py-12">
+        {user && (
+          <div className="flex items-center justify-between mb-6">
+            <span className="text-sm text-stone-400 truncate">{user.email}</span>
+            <button
+              onClick={signOut}
+              className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
         <h1 className="text-4xl font-bold text-stone-900 mb-2">Your Food</h1>
         <p className="text-stone-500 text-lg mb-8">
           A diary for everything you eat.
