@@ -37,6 +37,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
         entryType,
         venueName: entryType === 'eating_out' ? venueName.trim() : '',
         ateAt: new Date(ateAt).toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
         cost: cost ? parseFloat(cost) : null,
         companions: companions.trim(),
         rating,

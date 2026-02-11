@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getEntry, deleteEntry } from '../lib/entries'
+import { deletePhoto } from '../lib/storage'
+import { useAuth } from '../contexts/AuthContext'
 import PageShell from '../components/PageShell'
 import ConfirmDialog from '../components/ConfirmDialog'
 
@@ -23,9 +25,18 @@ function formatTime(dateStr) {
   })
 }
 
+function getPhotoPath(entry) {
+  if (entry.photo_path) return entry.photo_path
+  if (!entry.photo_url) return null
+  // Extract path from public URL for legacy entries without photo_path
+  const match = entry.photo_url.match(/\/meal-photos\/(.+?)(?:\?|$)/)
+  return match ? match[1] : null
+}
+
 function Entry() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [entry, setEntry] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -46,7 +57,30 @@ function Entry() {
   }, [id])
 
   async function handleDelete() {
+    if (!user?.id) {
+      setError('You must be signed in to delete this entry.')
+      return
+    }
     setDeleting(true)
+
+    // Delete photo first — if this fails, keep the entry so user can retry
+    const photoPath = getPhotoPath(entry)
+    if (photoPath) {
+      if (!photoPath.startsWith(user.id + '/')) {
+        setError('Cannot delete: photo path does not match your account')
+        setDeleting(false)
+        setShowDeleteConfirm(false)
+        return
+      }
+      const { error: photoError } = await deletePhoto(photoPath)
+      if (photoError) {
+        setError('Failed to delete photo. Entry kept so you can retry.')
+        setDeleting(false)
+        setShowDeleteConfirm(false)
+        return
+      }
+    }
+
     const { error } = await deleteEntry(id)
     if (error) {
       setError(error.message)
@@ -129,7 +163,7 @@ function Entry() {
         {entry.cost != null && (
           <div>
             <p className="text-xs text-stone-400 uppercase tracking-wide">Cost</p>
-            <p className="text-stone-700">${Number(entry.cost).toFixed(2)}</p>
+            <p className="text-stone-700">&#8377;{Number(entry.cost).toFixed(2)}</p>
           </div>
         )}
 

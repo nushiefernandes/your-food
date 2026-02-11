@@ -27,11 +27,13 @@ function Edit() {
 
   async function handleSubmit(formData) {
     let photoUrl = entry.photo_url
+    let photoPath = entry.photo_path
 
     if (formData.photoFile) {
-      const { url, error: uploadError } = await uploadPhoto(formData.photoFile)
+      const { url, path, error: uploadError } = await uploadPhoto(formData.photoFile)
       if (uploadError) throw uploadError
       photoUrl = url
+      photoPath = path
     }
 
     const { error } = await updateEntry(id, {
@@ -43,7 +45,9 @@ function Edit() {
       rating: formData.rating,
       notes: formData.notes || null,
       ate_at: formData.ateAt,
+      timezone: formData.timezone,
       photo_url: photoUrl,
+      photo_path: photoPath,
     })
 
     if (error) throw error
