@@ -104,13 +104,13 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
       {entryType === 'eating_out' && (
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">
-            Restaurant name
+            Where did you eat?
           </label>
           <input
             type="text"
             value={venueName}
             onChange={(e) => setVenueName(e.target.value)}
-            placeholder="e.g. Mabrouk"
+            placeholder="e.g. Mabrouk, Sarah's house, office party"
             className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
           />
         </div>
