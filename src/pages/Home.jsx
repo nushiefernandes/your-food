@@ -1,14 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { getEntries } from '../lib/entries'
 import { useAuth } from '../contexts/AuthContext'
 import EntryCard from '../components/EntryCard'
+
+const EMOJI_ROW = ['🍕', '🍜', '🌮', '🍛', '🍱']
+
+const EMPTY_STATE_HEADLINES = [
+  'Your food story starts with one bite',
+  "Your stomach's diary is empty",
+  'Every great food journey starts somewhere',
+  "No meals yet — let's fix that",
+  'Your taste buds have stories to tell',
+  'First meal, best meal — log it!',
+]
+
+function getRandomItem(items) {
+  if (!items?.length) return ''
+  return items[Math.floor(Math.random() * items.length)]
+}
 
 function Home() {
   const { user, signOut } = useAuth()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const emptyStateHeadline = useMemo(
+    () => getRandomItem(EMPTY_STATE_HEADLINES),
+    []
+  )
 
   useEffect(() => {
     async function fetchEntries() {
@@ -57,9 +77,22 @@ function Home() {
             <p className="text-red-500 text-center py-8">{error}</p>
           )}
           {!loading && !error && entries.length === 0 && (
-            <p className="text-stone-400 text-center py-8">
-              No meals logged yet. Tap above to add your first!
-            </p>
+            <div className="text-center py-8">
+              <div className="flex justify-center gap-3 text-3xl">
+                {EMOJI_ROW.map((emoji) => (
+                  <span key={emoji}>{emoji}</span>
+                ))}
+              </div>
+              <p className="text-lg font-medium text-stone-600 mt-4">
+                {emptyStateHeadline}
+              </p>
+              <Link
+                to="/add"
+                className="inline-block bg-stone-900 text-white px-6 py-3 rounded-lg font-medium hover:bg-stone-800 transition-colors mt-4"
+              >
+                Log your first meal
+              </Link>
+            </div>
           )}
           {entries.map((entry) => (
             <EntryCard key={entry.id} entry={entry} />
