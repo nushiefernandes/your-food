@@ -1,6 +1,29 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import PhotoUpload from './PhotoUpload'
 import StarRating from './StarRating'
+
+const EATING_OUT_PROMPTS = [
+  'Worth going back?',
+  'Any surprises on the menu?',
+  'Better than last time?',
+  'How did you find this place?',
+  'Would you order this again?',
+  'Who should you bring here next time?',
+]
+
+const HOME_COOKED_PROMPTS = [
+  'Would you make this again?',
+  'What would you change next time?',
+  'Where did you get the recipe?',
+  'How long did it take?',
+  'Any ingredient substitutions?',
+  'Who helped you cook?',
+]
+
+function getRandomItem(items) {
+  if (!items?.length) return ''
+  return items[Math.floor(Math.random() * items.length)]
+}
 
 function toDatetimeLocal(date) {
   const d = new Date(date)
@@ -22,6 +45,11 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
   const [notes, setNotes] = useState(initialData?.notes || '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const notesPlaceholder = useMemo(() => {
+    const prompts =
+      entryType === 'home_cooked' ? HOME_COOKED_PROMPTS : EATING_OUT_PROMPTS
+    return getRandomItem(prompts)
+  }, [entryType])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -171,7 +199,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Any thoughts about this meal?"
+          placeholder={notesPlaceholder}
           rows={3}
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white resize-none"
         />
