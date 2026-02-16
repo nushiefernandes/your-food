@@ -19,6 +19,13 @@ function formatTime(dateStr) {
 }
 
 function EntryCard({ entry }) {
+  const entryTypeLabel =
+    entry.entry_type === 'home_cooked'
+      ? 'Home cooked'
+      : entry.entry_type === 'eating_out'
+        ? 'Eating out'
+        : null
+
   return (
     <Link
       to={`/entry/${entry.id}`}
@@ -48,6 +55,9 @@ function EntryCard({ entry }) {
             <span className="text-xs text-amber-400">
               {'★'.repeat(entry.rating)}
             </span>
+          )}
+          {entryTypeLabel && (
+            <span className="text-xs text-stone-400">{entryTypeLabel}</span>
           )}
         </div>
       </div>

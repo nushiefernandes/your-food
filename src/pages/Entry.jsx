@@ -109,6 +109,13 @@ function Entry() {
     )
   }
 
+  const entryTypeLabel =
+    entry.entry_type === 'home_cooked'
+      ? '🏠 Home cooked'
+      : entry.entry_type === 'eating_out'
+        ? '🍽️ Eating out'
+        : null
+
   return (
     <PageShell backTo="/">
       {entry.photo_url ? (
@@ -127,13 +134,11 @@ function Entry() {
         {entry.dish_name}
       </h1>
 
-      <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full mb-4 ${
-        entry.entry_type === 'home_cooked'
-          ? 'bg-green-100 text-green-700'
-          : 'bg-blue-100 text-blue-700'
-      }`}>
-        {entry.entry_type === 'home_cooked' ? 'Home cooked' : 'Eating out'}
-      </span>
+      {entryTypeLabel && (
+        <span className="inline-block text-sm px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 mb-4">
+          {entryTypeLabel}
+        </span>
+      )}
 
       <div className="space-y-3 mb-8">
         {entry.venue_name && (
