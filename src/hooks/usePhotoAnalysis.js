@@ -38,6 +38,12 @@ export function usePhotoAnalysis() {
     const requestId = abortRef.current + 1;
     abortRef.current = requestId;
 
+    // Clean up previous upload if starting a new analysis (prevents orphan accumulation)
+    const previousPath = latestUploadPathRef.current;
+    if (previousPath) {
+      deletePhoto(previousPath);
+    }
+
     setAnalysis({
       status: 'uploading',
       suggestions: null,
@@ -46,72 +52,84 @@ export function usePhotoAnalysis() {
       error: null,
     });
 
-    const resizedFile = await resizeForAnalysis(file);
-    if (abortRef.current !== requestId) return;
+    try {
+      const resizedFile = await resizeForAnalysis(file);
+      if (abortRef.current !== requestId) return;
 
-    const uploadResult = await uploadPhoto(resizedFile);
-    if (abortRef.current !== requestId) return;
+      const uploadResult = await uploadPhoto(resizedFile);
+      if (abortRef.current !== requestId) return;
 
-    if (uploadResult?.error || !uploadResult?.path) {
+      if (uploadResult?.error || !uploadResult?.path) {
+        setAnalysis((prev) => {
+          if (abortRef.current !== requestId) return prev;
+          return {
+            status: 'error',
+            suggestions: null,
+            aiFields: new Set(),
+            uploadResult: null,
+            error: 'upload_failed',
+          };
+        });
+        return;
+      }
+
+      const storedUploadResult = { url: uploadResult.url, path: uploadResult.path };
+
       setAnalysis((prev) => {
         if (abortRef.current !== requestId) return prev;
         return {
-          status: 'error',
-          suggestions: null,
-          aiFields: new Set(),
-          uploadResult: null,
-          error: 'upload_failed',
-        };
-      });
-      return;
-    }
-
-    const storedUploadResult = { url: uploadResult.url, path: uploadResult.path };
-
-    setAnalysis((prev) => {
-      if (abortRef.current !== requestId) return prev;
-      return {
-        status: 'analyzing',
-        suggestions: null,
-        aiFields: new Set(),
-        uploadResult: storedUploadResult,
-        error: null,
-      };
-    });
-
-    const result = await analyzeDishPhoto(uploadResult.path);
-    if (abortRef.current !== requestId) return;
-
-    if (result?.error) {
-      setAnalysis((prev) => {
-        if (abortRef.current !== requestId) return prev;
-        return {
-          status: 'error',
+          status: 'analyzing',
           suggestions: null,
           aiFields: new Set(),
           uploadResult: storedUploadResult,
-          error: result.error,
+          error: null,
         };
       });
-      return;
+
+      const result = await analyzeDishPhoto(uploadResult.path);
+      if (abortRef.current !== requestId) return;
+
+      if (result?.error) {
+        setAnalysis((prev) => {
+          if (abortRef.current !== requestId) return prev;
+          return {
+            status: 'error',
+            suggestions: null,
+            aiFields: new Set(),
+            uploadResult: storedUploadResult,
+            error: result.error,
+          };
+        });
+        return;
+      }
+
+      const filtered = result?.suggestions
+        ? filterByConfidence(result.suggestions)
+        : null;
+
+      const aiFields = new Set(filtered ? Object.keys(filtered) : []);
+
+      setAnalysis((prev) => {
+        if (abortRef.current !== requestId) return prev;
+        return {
+          status: 'done',
+          suggestions: filtered,
+          aiFields,
+          uploadResult: storedUploadResult,
+          error: null,
+        };
+      });
+    } catch {
+      if (abortRef.current !== requestId) return;
+      setAnalysis((prev) => {
+        if (abortRef.current !== requestId) return prev;
+        return {
+          ...prev,
+          status: 'error',
+          error: 'resize_failed',
+        };
+      });
     }
-
-    const filtered = result?.suggestions
-      ? filterByConfidence(result.suggestions)
-      : null;
-
-    const aiFields = new Set(filtered ? Object.keys(filtered) : []);
-
-    setAnalysis((prev) => {
-      if (abortRef.current !== requestId) return prev;
-      return {
-        status: 'done',
-        suggestions: filtered,
-        aiFields,
-        uploadResult: storedUploadResult,
-        error: null,
-      };
-    });
   }, []);
 
   const clearAnalysis = useCallback(() => {

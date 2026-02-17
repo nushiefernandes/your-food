@@ -28,6 +28,9 @@ export async function analyzeDishPhoto(photoPath) {
     }
   }
 
+  // Dual timeout: AbortController cancels the in-flight request (resource cleanup),
+  // while Promise.race guarantees timeout behavior even if supabase.functions.invoke
+  // doesn't reliably honor AbortSignal in all environments/SDK versions.
   const controller = new AbortController()
   const timeoutId = setTimeout(() => {
     controller.abort()

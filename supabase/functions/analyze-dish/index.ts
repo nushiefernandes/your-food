@@ -1,9 +1,11 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "@supabase/functions-js/edge-runtime.d.ts"
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*"
+const IS_DEV = Deno.env.get("ENV") === "development"
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || (IS_DEV ? "*" : "")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || ""
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || ""
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB
 
 const PROMPT = `You are a food identification expert specializing in Indian cuisine and international dishes commonly eaten in India.
 
@@ -64,6 +66,15 @@ function allConfidenceZero(parsed: Record<string, unknown>): boolean {
 }
 
 Deno.serve(async (req) => {
+  // Fail-closed CORS: reject non-OPTIONS requests when ALLOWED_ORIGIN is not configured
+  if (!ALLOWED_ORIGIN) {
+    console.error("ALLOWED_ORIGIN not set — refusing request. Set ENV=development for local dev.")
+    return new Response(JSON.stringify({ suggestions: null, error: "api_error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
@@ -73,10 +84,29 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Extract user ID from JWT for ownership check
+    const authHeader = req.headers.get("authorization") || ""
+    const token = authHeader.replace("Bearer ", "")
+    let userId = ""
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]))
+        userId = payload.sub || ""
+      } catch {
+        // JWT decode failed — Supabase verify_jwt handles auth, this is for ownership only
+      }
+    }
+
     const body = await req.json()
     const photoPath = body?.photoPath
 
     if (typeof photoPath !== "string" || !isValidPhotoPath(photoPath)) {
+      return jsonResponse({ suggestions: null, error: "invalid_path" })
+    }
+
+    // Ownership check: photoPath must start with the authenticated user's ID
+    if (userId && !photoPath.startsWith(userId + "/")) {
+      console.error("Ownership check failed:", photoPath, "for user", userId)
       return jsonResponse({ suggestions: null, error: "invalid_path" })
     }
 
@@ -89,9 +119,22 @@ Deno.serve(async (req) => {
       return jsonResponse({ suggestions: null, error: "api_error" })
     }
 
+    // Size limit: reject images larger than 5MB (defense-in-depth; client resizes to ~200KB)
+    const contentLength = parseInt(imageResponse.headers.get("content-length") || "0", 10)
+    if (contentLength > MAX_IMAGE_BYTES) {
+      console.error("Image too large:", contentLength, "bytes")
+      return jsonResponse({ suggestions: null, error: "payload_too_large" })
+    }
+
     const contentType = imageResponse.headers.get("content-type") ||
       "image/jpeg"
     const arrayBuffer = await imageResponse.arrayBuffer()
+
+    // Double-check actual size (content-length can be missing or wrong)
+    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+      console.error("Image body too large:", arrayBuffer.byteLength, "bytes")
+      return jsonResponse({ suggestions: null, error: "payload_too_large" })
+    }
     const base64 = arrayBufferToBase64(arrayBuffer)
 
     const controller = new AbortController()
