@@ -10,7 +10,7 @@ function PageShell({ children, title, backTo }) {
         {backTo ? (
           <Link
             to={backTo}
-            className="text-sm text-stone-400 hover:text-stone-600 transition-colors mb-6"
+            className="block relative z-10 text-sm text-stone-400 hover:text-stone-600 transition-colors mb-6"
           >
             &larr; Back
           </Link>

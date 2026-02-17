@@ -36,6 +36,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
   const [dishName, setDishName] = useState(initialData?.dish_name || '')
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
+  const [showMore, setShowMore] = useState(initialData?.is_combo || false)
   const [venueName, setVenueName] = useState(initialData?.venue_name || '')
   const [recipeUrl, setRecipeUrl] = useState(initialData?.recipe_url || '')
   const [prepTime, setPrepTime] = useState(
@@ -147,55 +148,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
             Home cooked
           </button>
         </div>
-        <label className="flex items-start gap-2 mt-2">
-          <input
-            type="checkbox"
-            checked={isCombo}
-            onChange={(e) => setIsCombo(e.target.checked)}
-            className="mt-1 accent-stone-900"
-          />
-          <span>
-            <span className="text-sm font-medium text-stone-700">
-              This is a combo meal
-            </span>
-            <span className="block text-xs text-stone-400">
-              Includes both restaurant and homemade elements
-            </span>
-          </span>
-        </label>
       </div>
-
-      {entryType === 'home_cooked' && (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Recipe URL
-            </label>
-            <input
-              type="url"
-              value={recipeUrl}
-              onChange={(e) => setRecipeUrl(e.target.value)}
-              placeholder="e.g. https://..."
-              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Prep time (minutes)
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="1"
-              value={prepTime}
-              onChange={(e) => setPrepTime(e.target.value)}
-              placeholder="e.g. 30"
-              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
-            />
-          </div>
-        </>
-      )}
 
       {entryType === 'eating_out' && (
         <div>
@@ -271,6 +224,66 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
           rows={3}
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white resize-none"
         />
+      </div>
+
+      {entryType === 'home_cooked' && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">
+              Recipe URL
+            </label>
+            <input
+              type="url"
+              value={recipeUrl}
+              onChange={(e) => setRecipeUrl(e.target.value)}
+              placeholder="e.g. https://..."
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">
+              Prep time (minutes)
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              value={prepTime}
+              onChange={(e) => setPrepTime(e.target.value)}
+              placeholder="e.g. 30"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
+            />
+          </div>
+        </>
+      )}
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowMore(!showMore)}
+          className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+        >
+          {showMore ? '− Fewer options' : '+ More options'}
+        </button>
+        {showMore && (
+          <label className="flex items-start gap-2 mt-2">
+            <input
+              type="checkbox"
+              checked={isCombo}
+              onChange={(e) => setIsCombo(e.target.checked)}
+              className="mt-1 accent-stone-900"
+            />
+            <span>
+              <span className="text-sm font-medium text-stone-700">
+                This is a combo meal
+              </span>
+              <span className="block text-xs text-stone-400">
+                Includes both restaurant and homemade elements
+              </span>
+            </span>
+          </label>
+        )}
       </div>
 
       {error && (

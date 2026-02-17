@@ -126,10 +126,10 @@ function Entry() {
         <img
           src={entry.photo_url}
           alt={entry.dish_name}
-          className="w-full h-64 object-cover rounded-lg mb-4 -mt-2"
+          className="w-full h-64 object-cover rounded-lg mb-4"
         />
       ) : (
-        <div className="w-full h-40 bg-stone-100 rounded-lg flex items-center justify-center mb-4 -mt-2">
+        <div className="w-full h-40 bg-stone-100 rounded-lg flex items-center justify-center mb-4">
           <span className="text-stone-300 text-5xl">&#127858;</span>
         </div>
       )}
