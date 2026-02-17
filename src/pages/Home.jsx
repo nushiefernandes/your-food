@@ -48,7 +48,9 @@ function Home() {
   useEffect(() => {
     if (searchParams.get('saved')) {
       setShowToast(true)
-      setSearchParams({}, { replace: true })
+      const newParams = new URLSearchParams(searchParams)
+      newParams.delete('saved')
+      setSearchParams(newParams, { replace: true })
       const timer = setTimeout(() => setShowToast(false), 2500)
       return () => clearTimeout(timer)
     }
