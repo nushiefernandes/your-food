@@ -64,6 +64,18 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
     setError(null)
 
     try {
+      let safeRecipeUrl = recipeUrl.trim() || null
+      if (safeRecipeUrl) {
+        try {
+          const parsed = new URL(safeRecipeUrl)
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            safeRecipeUrl = null
+          }
+        } catch {
+          // Not a valid URL, keep as-is (could be partial like "grandma's cookbook")
+        }
+      }
+
       await onSubmit({
         photoFile,
         dishName: dishName.trim(),
@@ -76,8 +88,8 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
         rating,
         notes: notes.trim(),
         isCombo,
-        recipeUrl: recipeUrl.trim(),
-        prepTime,
+        recipeUrl: safeRecipeUrl,
+        prepTime: prepTime ? parseInt(prepTime, 10) : null,
       })
     } catch (err) {
       setError(err.message || 'Something went wrong')
@@ -147,7 +159,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
               This is a combo meal
             </span>
             <span className="block text-xs text-stone-400">
-              Mix of eating out and home cooked
+              Includes both restaurant and homemade elements
             </span>
           </span>
         </label>

@@ -29,8 +29,8 @@ function Add() {
       is_combo: formData.isCombo,
       ate_at: formData.ateAt,
       timezone: formData.timezone,
-      recipe_url: formData.recipeUrl || null,
-      prep_time_minutes: formData.prepTime ? parseInt(formData.prepTime) : null,
+      recipe_url: formData.recipeUrl,
+      prep_time_minutes: formData.prepTime,
       photo_url: photoUrl,
       photo_path: photoPath,
     })

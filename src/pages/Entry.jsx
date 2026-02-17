@@ -162,14 +162,19 @@ function Entry() {
         {entry.recipe_url && (
           <div>
             <p className="text-xs text-stone-400 uppercase tracking-wide">Recipe</p>
-            <a
-              href={entry.recipe_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block truncate text-blue-600 hover:underline"
-            >
-              {entry.recipe_url}
-            </a>
+            {entry.recipe_url.startsWith('http://') ||
+            entry.recipe_url.startsWith('https://') ? (
+              <a
+                href={entry.recipe_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block truncate text-blue-600 hover:underline"
+              >
+                {entry.recipe_url}
+              </a>
+            ) : (
+              <p className="text-stone-700">{entry.recipe_url}</p>
+            )}
           </div>
         )}
 
