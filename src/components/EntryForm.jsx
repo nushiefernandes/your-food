@@ -50,6 +50,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   const [companions, setCompanions] = useState(initialData?.companions || '')
   const [rating, setRating] = useState(initialData?.rating || null)
   const [notes, setNotes] = useState(initialData?.notes || '')
+  const [aiVisible, setAiVisible] = useState(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const notesPlaceholder = useMemo(() => {
@@ -66,7 +67,17 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
     if (s.entry_type) setEntryType(s.entry_type)
     if (s.estimated_cost && !cost) setCost(String(s.estimated_cost))
     if (s.description && !notes) setNotes(s.description)
+    setAiVisible(new Set(analysis.aiFields))
   }, [analysis?.status, analysis?.suggestions])
+
+  function clearAiBadge(field) {
+    setAiVisible((prev) => {
+      if (!prev.has(field)) return prev
+      const next = new Set(prev)
+      next.delete(field)
+      return next
+    })
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -130,11 +141,17 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           What did you eat? *
+          {aiVisible.has('dish_name') && (
+            <span className="text-xs text-amber-600 ml-1">AI</span>
+          )}
         </label>
         <input
           type="text"
           value={dishName}
-          onChange={(e) => setDishName(e.target.value)}
+          onChange={(e) => {
+            setDishName(e.target.value)
+            clearAiBadge('dish_name')
+          }}
           placeholder="e.g. Chicken biryani"
           required
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
@@ -143,12 +160,37 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
 
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
+          Cuisine type
+          {aiVisible.has('cuisine_type') && (
+            <span className="text-xs text-amber-600 ml-1">AI</span>
+          )}
+        </label>
+        <input
+          type="text"
+          value={cuisineType}
+          onChange={(e) => {
+            setCuisineType(e.target.value)
+            clearAiBadge('cuisine_type')
+          }}
+          placeholder="e.g. North Indian, Italian, Chinese"
+          className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-stone-700 mb-1">
           Meal type
+          {aiVisible.has('entry_type') && (
+            <span className="text-xs text-amber-600 ml-1">AI</span>
+          )}
         </label>
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setEntryType('eating_out')}
+            onClick={() => {
+              setEntryType('eating_out')
+              clearAiBadge('entry_type')
+            }}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               entryType === 'eating_out'
                 ? 'bg-stone-900 text-white'
@@ -159,7 +201,10 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
           </button>
           <button
             type="button"
-            onClick={() => setEntryType('home_cooked')}
+            onClick={() => {
+              setEntryType('home_cooked')
+              clearAiBadge('entry_type')
+            }}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               entryType === 'home_cooked'
                 ? 'bg-stone-900 text-white'
@@ -201,6 +246,9 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           Cost
+          {aiVisible.has('estimated_cost') && (
+            <span className="text-xs text-amber-600 ml-1">AI</span>
+          )}
         </label>
         <input
           type="number"
@@ -208,7 +256,10 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
           step="0.01"
           min="0"
           value={cost}
-          onChange={(e) => setCost(e.target.value)}
+          onChange={(e) => {
+            setCost(e.target.value)
+            clearAiBadge('estimated_cost')
+          }}
           placeholder="0.00"
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
         />
@@ -237,10 +288,16 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           Notes
+          {aiVisible.has('description') && (
+            <span className="text-xs text-amber-600 ml-1">AI</span>
+          )}
         </label>
         <textarea
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(e) => {
+            setNotes(e.target.value)
+            clearAiBadge('description')
+          }}
           placeholder={notesPlaceholder}
           rows={3}
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white resize-none"
