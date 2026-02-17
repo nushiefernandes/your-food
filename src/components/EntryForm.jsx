@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import PhotoUpload from './PhotoUpload'
 import StarRating from './StarRating'
 
@@ -31,13 +31,14 @@ function toDatetimeLocal(date) {
   return d.toISOString().slice(0, 16)
 }
 
-function EntryForm({ initialData, onSubmit, submitLabel }) {
+function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelected, onPhotoClear }) {
   const [photoFile, setPhotoFile] = useState(null)
   const [dishName, setDishName] = useState(initialData?.dish_name || '')
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
   const [showMore, setShowMore] = useState(initialData?.is_combo || false)
   const [venueName, setVenueName] = useState(initialData?.venue_name || '')
+  const [cuisineType, setCuisineType] = useState(initialData?.cuisine_type || '')
   const [recipeUrl, setRecipeUrl] = useState(initialData?.recipe_url || '')
   const [prepTime, setPrepTime] = useState(
     initialData?.prep_time_minutes?.toString() || ''
@@ -56,6 +57,16 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
       entryType === 'home_cooked' ? HOME_COOKED_PROMPTS : EATING_OUT_PROMPTS
     return getRandomItem(prompts)
   }, [entryType])
+
+  useEffect(() => {
+    if (analysis?.status !== 'done' || !analysis?.suggestions) return
+    const s = analysis.suggestions
+    if (s.dish_name && !dishName) setDishName(s.dish_name)
+    if (s.cuisine_type && !cuisineType) setCuisineType(s.cuisine_type)
+    if (s.entry_type) setEntryType(s.entry_type)
+    if (s.estimated_cost && !cost) setCost(String(s.estimated_cost))
+    if (s.description && !notes) setNotes(s.description)
+  }, [analysis?.status, analysis?.suggestions])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -91,6 +102,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
         isCombo,
         recipeUrl: safeRecipeUrl,
         prepTime: prepTime ? parseInt(prepTime, 10) : null,
+        cuisineType: cuisineType.trim(),
       })
     } catch (err) {
       setError(err.message || 'Something went wrong')
@@ -102,9 +114,18 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <PhotoUpload
         existingUrl={initialData?.photo_url}
-        onFileSelect={setPhotoFile}
-        onClear={() => setPhotoFile(null)}
+        onFileSelect={(file) => {
+          setPhotoFile(file)
+          if (onPhotoSelected) onPhotoSelected(file)
+        }}
+        onClear={() => {
+          setPhotoFile(null)
+          if (onPhotoClear) onPhotoClear()
+        }}
       />
+      {(analysis?.status === 'uploading' || analysis?.status === 'analyzing') && (
+        <p className="text-xs text-stone-400 mt-1">Analyzing photo...</p>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
