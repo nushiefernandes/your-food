@@ -36,7 +36,7 @@ function Add() {
     })
 
     if (error) throw error
-    navigate('/')
+    navigate('/?saved=1')
   }
 
   return (

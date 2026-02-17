@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { getEntries } from '../lib/entries'
 import { useAuth } from '../contexts/AuthContext'
 import EntryCard from '../components/EntryCard'
@@ -22,6 +22,8 @@ function getRandomItem(items) {
 
 function Home() {
   const { user, signOut } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [showToast, setShowToast] = useState(false)
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -42,6 +44,15 @@ function Home() {
     }
     fetchEntries()
   }, [])
+
+  useEffect(() => {
+    if (searchParams.get('saved')) {
+      setShowToast(true)
+      setSearchParams({}, { replace: true })
+      const timer = setTimeout(() => setShowToast(false), 2500)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, setSearchParams])
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -68,6 +79,12 @@ function Home() {
         >
           + Log a meal
         </Link>
+
+        {showToast && (
+          <div className="mt-4 bg-green-50 border border-green-200 text-green-700 text-sm font-medium px-4 py-2 rounded-lg text-center transition-opacity duration-500">
+            Meal saved!
+          </div>
+        )}
 
         <div className="mt-8 space-y-3">
           {loading && (
