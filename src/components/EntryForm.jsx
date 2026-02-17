@@ -35,6 +35,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
   const [photoFile, setPhotoFile] = useState(null)
   const [dishName, setDishName] = useState(initialData?.dish_name || '')
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
+  const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
   const [venueName, setVenueName] = useState(initialData?.venue_name || '')
   const [ateAt, setAteAt] = useState(
     toDatetimeLocal(initialData?.ate_at || new Date())
@@ -70,6 +71,7 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
         companions: companions.trim(),
         rating,
         notes: notes.trim(),
+        isCombo,
       })
     } catch (err) {
       setError(err.message || 'Something went wrong')
@@ -127,6 +129,22 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
             Home cooked
           </button>
         </div>
+        <label className="flex items-start gap-2 mt-2">
+          <input
+            type="checkbox"
+            checked={isCombo}
+            onChange={(e) => setIsCombo(e.target.checked)}
+            className="mt-1 accent-stone-900"
+          />
+          <span>
+            <span className="text-sm font-medium text-stone-700">
+              This is a combo meal
+            </span>
+            <span className="block text-xs text-stone-400">
+              Mix of eating out and home cooked
+            </span>
+          </span>
+        </label>
       </div>
 
       {entryType === 'eating_out' && (

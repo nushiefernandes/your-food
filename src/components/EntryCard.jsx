@@ -59,6 +59,9 @@ function EntryCard({ entry }) {
           {entryTypeLabel && (
             <span className="text-xs text-stone-400">{entryTypeLabel}</span>
           )}
+          {entry.is_combo && (
+            <span className="text-xs text-stone-400">🔀</span>
+          )}
         </div>
       </div>
     </Link>

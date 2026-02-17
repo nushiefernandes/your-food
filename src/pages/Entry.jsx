@@ -115,6 +115,10 @@ function Entry() {
       : entry.entry_type === 'eating_out'
         ? '🍽️ Eating out'
         : null
+  const entryTypeDisplay =
+    entryTypeLabel && entry.is_combo
+      ? `${entryTypeLabel} · Combo`
+      : entryTypeLabel
 
   return (
     <PageShell backTo="/">
@@ -134,9 +138,9 @@ function Entry() {
         {entry.dish_name}
       </h1>
 
-      {entryTypeLabel && (
+      {entryTypeDisplay && (
         <span className="inline-block text-sm px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 mb-4">
-          {entryTypeLabel}
+          {entryTypeDisplay}
         </span>
       )}
 

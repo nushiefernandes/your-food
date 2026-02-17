@@ -44,6 +44,7 @@ function Edit() {
       companions: formData.companions || null,
       rating: formData.rating,
       notes: formData.notes || null,
+      is_combo: formData.isCombo,
       ate_at: formData.ateAt,
       timezone: formData.timezone,
       photo_url: photoUrl,
