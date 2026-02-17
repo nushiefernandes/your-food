@@ -21,9 +21,9 @@ function formatTime(dateStr) {
 function EntryCard({ entry }) {
   const entryTypeLabel =
     entry.entry_type === 'home_cooked'
-      ? 'Home cooked'
+      ? '🏠'
       : entry.entry_type === 'eating_out'
-        ? 'Eating out'
+        ? '🍽️'
         : null
 
   return (
