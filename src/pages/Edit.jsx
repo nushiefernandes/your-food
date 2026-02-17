@@ -47,6 +47,8 @@ function Edit() {
       is_combo: formData.isCombo,
       ate_at: formData.ateAt,
       timezone: formData.timezone,
+      recipe_url: formData.recipeUrl || null,
+      prep_time_minutes: formData.prepTime ? parseInt(formData.prepTime) : null,
       photo_url: photoUrl,
       photo_path: photoPath,
     })

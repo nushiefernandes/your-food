@@ -37,6 +37,10 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
   const [venueName, setVenueName] = useState(initialData?.venue_name || '')
+  const [recipeUrl, setRecipeUrl] = useState(initialData?.recipe_url || '')
+  const [prepTime, setPrepTime] = useState(
+    initialData?.prep_time_minutes?.toString() || ''
+  )
   const [ateAt, setAteAt] = useState(
     toDatetimeLocal(initialData?.ate_at || new Date())
   )
@@ -72,6 +76,8 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
         rating,
         notes: notes.trim(),
         isCombo,
+        recipeUrl: recipeUrl.trim(),
+        prepTime,
       })
     } catch (err) {
       setError(err.message || 'Something went wrong')
@@ -146,6 +152,38 @@ function EntryForm({ initialData, onSubmit, submitLabel }) {
           </span>
         </label>
       </div>
+
+      {entryType === 'home_cooked' && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">
+              Recipe URL
+            </label>
+            <input
+              type="url"
+              value={recipeUrl}
+              onChange={(e) => setRecipeUrl(e.target.value)}
+              placeholder="e.g. https://..."
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">
+              Prep time (minutes)
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              value={prepTime}
+              onChange={(e) => setPrepTime(e.target.value)}
+              placeholder="e.g. 30"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
+            />
+          </div>
+        </>
+      )}
 
       {entryType === 'eating_out' && (
         <div>

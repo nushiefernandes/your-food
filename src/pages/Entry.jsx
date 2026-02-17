@@ -159,6 +159,31 @@ function Entry() {
           </p>
         </div>
 
+        {entry.recipe_url && (
+          <div>
+            <p className="text-xs text-stone-400 uppercase tracking-wide">Recipe</p>
+            <a
+              href={entry.recipe_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block truncate text-blue-600 hover:underline"
+            >
+              {entry.recipe_url}
+            </a>
+          </div>
+        )}
+
+        {entry.prep_time_minutes && (
+          <div>
+            <p className="text-xs text-stone-400 uppercase tracking-wide">
+              Prep time
+            </p>
+            <p className="text-stone-700">
+              {entry.prep_time_minutes} minutes
+            </p>
+          </div>
+        )}
+
         {entry.rating && (
           <div>
             <p className="text-xs text-stone-400 uppercase tracking-wide">Rating</p>
