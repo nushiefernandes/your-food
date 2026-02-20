@@ -75,12 +75,14 @@ function Home() {
           A diary for everything you eat.
         </p>
 
-        <Link
-          to="/add"
-          className="inline-block bg-stone-900 text-white px-6 py-3 rounded-lg font-medium hover:bg-stone-800 transition-colors"
-        >
-          + Log a meal
-        </Link>
+        {entries.length > 0 && (
+          <Link
+            to="/add"
+            className="inline-block bg-stone-900 text-white px-6 py-3 rounded-lg font-medium hover:bg-stone-800 transition-colors"
+          >
+            + Log a meal
+          </Link>
+        )}
 
         {showToast && (
           <div className="mt-4 bg-green-50 border border-green-200 text-green-700 text-sm font-medium px-4 py-2 rounded-lg text-center transition-opacity duration-500">
