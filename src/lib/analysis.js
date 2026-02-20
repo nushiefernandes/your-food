@@ -15,13 +15,7 @@ export async function analyzeDishPhoto(photoPath) {
     return {
       suggestions: {
         dish_name: { value: 'Mock Paneer Tikka', confidence: 0.95 },
-        cuisine_type: { value: 'North Indian', confidence: 0.9 },
-        entry_type: { value: 'eating_out', confidence: 0.8 },
-        estimated_cost: { value: 350, confidence: 0.6 },
-        description: {
-          value: 'Chunks of paneer marinated in spices and grilled in a tandoor.',
-          confidence: 0.85
-        }
+        cuisine_type: { value: 'North Indian', confidence: 0.9 }
       },
       model: 'mock',
       latency_ms: 800

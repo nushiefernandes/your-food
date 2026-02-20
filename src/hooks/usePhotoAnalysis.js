@@ -4,6 +4,8 @@ import { resizeForAnalysis } from '../lib/imageUtils';
 import { uploadPhoto, deletePhoto } from '../lib/storage';
 import { analyzeDishPhoto, filterByConfidence } from '../lib/analysis';
 
+const AI_FIELDS = new Set(['dish_name', 'cuisine_type']);
+
 const IDLE_STATE = {
   status: 'idle',
   suggestions: null,
@@ -103,8 +105,14 @@ export function usePhotoAnalysis() {
         return;
       }
 
-      const filtered = result?.suggestions
+      const allFiltered = result?.suggestions
         ? filterByConfidence(result.suggestions)
+        : null;
+
+      const filtered = allFiltered
+        ? Object.fromEntries(
+            Object.entries(allFiltered).filter(([k]) => AI_FIELDS.has(k))
+          )
         : null;
 
       const aiFields = new Set(filtered ? Object.keys(filtered) : []);

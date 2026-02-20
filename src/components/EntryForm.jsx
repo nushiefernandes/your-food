@@ -64,9 +64,6 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
     const s = analysis.suggestions
     if (s.dish_name && !dishName) setDishName(s.dish_name)
     if (s.cuisine_type && !cuisineType) setCuisineType(s.cuisine_type)
-    if (s.entry_type) setEntryType(s.entry_type)
-    if (s.estimated_cost && !cost) setCost(String(s.estimated_cost))
-    if (s.description && !notes) setNotes(s.description)
     setAiVisible(new Set(analysis.aiFields))
   }, [analysis?.status, analysis?.suggestions])
 
@@ -180,16 +177,12 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           Meal type
-          {aiVisible.has('entry_type') && (
-            <span className="text-xs text-amber-600 ml-1">AI</span>
-          )}
         </label>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => {
               setEntryType('eating_out')
-              clearAiBadge('entry_type')
             }}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               entryType === 'eating_out'
@@ -203,7 +196,6 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
             type="button"
             onClick={() => {
               setEntryType('home_cooked')
-              clearAiBadge('entry_type')
             }}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               entryType === 'home_cooked'
@@ -246,9 +238,6 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           Cost
-          {aiVisible.has('estimated_cost') && (
-            <span className="text-xs text-amber-600 ml-1">AI</span>
-          )}
         </label>
         <input
           type="number"
@@ -256,10 +245,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
           step="0.01"
           min="0"
           value={cost}
-          onChange={(e) => {
-            setCost(e.target.value)
-            clearAiBadge('estimated_cost')
-          }}
+          onChange={(e) => setCost(e.target.value)}
           placeholder="0.00"
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
         />
@@ -288,16 +274,10 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           Notes
-          {aiVisible.has('description') && (
-            <span className="text-xs text-amber-600 ml-1">AI</span>
-          )}
         </label>
         <textarea
           value={notes}
-          onChange={(e) => {
-            setNotes(e.target.value)
-            clearAiBadge('description')
-          }}
+          onChange={(e) => setNotes(e.target.value)}
           placeholder={notesPlaceholder}
           rows={3}
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white resize-none"

@@ -9,16 +9,19 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB
 
 const PROMPT = `You are a food identification expert specializing in Indian cuisine and international dishes commonly eaten in India.
 
-Analyze this food photo and return structured data about the dish.
+Analyze this food photo and return a JSON object with exactly these two fields:
 
-IMPORTANT RULES:
-- Use the local/native name for dishes (e.g., "Paneer Butter Masala" not "Indian cottage cheese curry", "Idli" not "steamed rice cake", "Biryani" not "spiced rice with meat")
-- For Indian dishes, use the most commonly recognized name (Hindi/regional transliteration in English)
+{
+  "dish_name": { "value": "<local/native dish name>", "confidence": <0.0-1.0> },
+  "cuisine_type": { "value": "<cuisine category>", "confidence": <0.0-1.0> }
+}
+
+RULES:
+- Use the local/native name (e.g. "Paneer Butter Masala", "Idli", "Biryani")
+- For Indian dishes, use the most commonly recognized Hindi/regional transliteration
 - If multiple dishes are visible, identify the primary/main dish
-- If this is clearly not food, set all confidence values to 0
-- For entry_type: "eating_out" if plating/setting suggests restaurant, "home_cooked" if home preparation
-- For estimated_cost: estimate in Indian Rupees (₹). For eating_out, restaurant price. For home_cooked, ingredient cost.
-- confidence is your certainty from 0.0 to 1.0
+- If this is clearly not food, set both confidence values to 0
+- Return ONLY the JSON object, no other text
 `
 
 const CORS_HEADERS = {
