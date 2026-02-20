@@ -1,3 +1,12 @@
+function isHeic(file) {
+  return (
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    /\.heic$/i.test(file.name) ||
+    /\.heif$/i.test(file.name)
+  )
+}
+
 function toJpegName(originalName) {
   const base = originalName.replace(/\.[^/.]+$/, '')
   return `${base}.jpg`
@@ -7,6 +16,11 @@ export function resizeForAnalysis(file) {
   return new Promise((resolve, reject) => {
     if (!file) {
       reject(new Error('No file provided'))
+      return
+    }
+
+    if (isHeic(file)) {
+      reject(new Error('heic_unsupported'))
       return
     }
 

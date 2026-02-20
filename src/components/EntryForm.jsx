@@ -134,6 +134,16 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       {(analysis?.status === 'uploading' || analysis?.status === 'analyzing') && (
         <p className="text-xs text-stone-400 mt-1">Analyzing photo...</p>
       )}
+      {analysis?.error === 'heic_unsupported' && (
+        <p className="text-xs text-red-500 mt-1">
+          HEIC photos aren't supported yet. In Photos, share the image as JPEG and try again.
+        </p>
+      )}
+      {analysis?.error === 'resize_failed' && (
+        <p className="text-xs text-red-500 mt-1">
+          Could not process this photo. Try a different image.
+        </p>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 
 function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
   const [previewUrl, setPreviewUrl] = useState(existingUrl || null)
+  const [isHeicPreview, setIsHeicPreview] = useState(false)
   const inputRef = useRef(null)
 
   useEffect(() => {
@@ -20,8 +21,20 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
       URL.revokeObjectURL(previewUrl)
     }
 
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
+    const isHeicFile =
+      file.type === 'image/heic' ||
+      file.type === 'image/heif' ||
+      /\.heic$/i.test(file.name) ||
+      /\.heif$/i.test(file.name)
+
+    if (isHeicFile) {
+      setIsHeicPreview(true)
+      setPreviewUrl(null)
+    } else {
+      setIsHeicPreview(false)
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
+    }
     onFileSelect(file)
   }
 
@@ -30,18 +43,25 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
       URL.revokeObjectURL(previewUrl)
     }
     setPreviewUrl(null)
+    setIsHeicPreview(false)
     if (inputRef.current) inputRef.current.value = ''
     onClear()
   }
 
-  if (previewUrl) {
+  if (previewUrl || isHeicPreview) {
     return (
       <div className="relative mb-4">
-        <img
-          src={previewUrl}
-          alt="Meal preview"
-          className="w-full h-48 object-cover rounded-lg"
-        />
+        {isHeicPreview ? (
+          <div className="w-full h-48 rounded-lg bg-stone-100 flex items-center justify-center text-stone-400 text-sm">
+            HEIC photo selected — preview not available in this browser
+          </div>
+        ) : (
+          <img
+            src={previewUrl}
+            alt="Meal preview"
+            className="w-full h-48 object-cover rounded-lg"
+          />
+        )}
         <button
           type="button"
           onClick={handleClear}

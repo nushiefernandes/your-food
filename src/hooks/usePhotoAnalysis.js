@@ -127,14 +127,15 @@ export function usePhotoAnalysis() {
           error: null,
         };
       });
-    } catch {
+    } catch (err) {
       if (abortRef.current !== requestId) return;
+      const errorCode = err?.message === 'heic_unsupported' ? 'heic_unsupported' : 'resize_failed';
       setAnalysis((prev) => {
         if (abortRef.current !== requestId) return prev;
         return {
           ...prev,
           status: 'error',
-          error: 'resize_failed',
+          error: errorCode,
         };
       });
     }
