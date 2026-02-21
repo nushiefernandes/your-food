@@ -15,7 +15,8 @@ export async function analyzeDishPhoto(photoPath) {
     return {
       suggestions: {
         dish_name: { value: 'Mock Paneer Tikka', confidence: 0.95 },
-        cuisine_type: { value: 'North Indian', confidence: 0.9 }
+        cuisine_type: { value: 'North Indian', confidence: 0.9 },
+        entry_type: { value: 'eating_out', confidence: 0.8 }
       },
       model: 'mock',
       latency_ms: 800

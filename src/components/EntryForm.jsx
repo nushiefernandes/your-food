@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import PhotoUpload from './PhotoUpload'
 import StarRating from './StarRating'
 
@@ -50,6 +50,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   const [companions, setCompanions] = useState(initialData?.companions || '')
   const [rating, setRating] = useState(initialData?.rating || null)
   const [notes, setNotes] = useState(initialData?.notes || '')
+  const userTouchedEntryType = useRef(!!initialData?.entry_type)
   const [aiVisible, setAiVisible] = useState(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -64,6 +65,9 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
     const s = analysis.suggestions
     if (s.dish_name && !dishName) setDishName(s.dish_name)
     if (s.cuisine_type && !cuisineType) setCuisineType(s.cuisine_type)
+    if (s.entry_type && !userTouchedEntryType.current && (s.entry_type === 'eating_out' || s.entry_type === 'home_cooked')) {
+      setEntryType(s.entry_type)
+    }
     setAiVisible(new Set(analysis.aiFields))
   }, [analysis?.status, analysis?.suggestions])
 
@@ -134,11 +138,6 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       {(analysis?.status === 'uploading' || analysis?.status === 'analyzing') && (
         <p className="text-xs text-stone-400 mt-1">Analyzing photo...</p>
       )}
-      {analysis?.error === 'heic_unsupported' && (
-        <p className="text-xs text-red-500 mt-1">
-          HEIC photos aren't supported yet. In Photos, share the image as JPEG and try again.
-        </p>
-      )}
       {analysis?.error === 'resize_failed' && (
         <p className="text-xs text-red-500 mt-1">
           Could not process this photo. Try a different image.
@@ -187,12 +186,17 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           Meal type
+          {aiVisible.has('entry_type') && (
+            <span className="text-xs text-amber-600 ml-1">AI</span>
+          )}
         </label>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => {
               setEntryType('eating_out')
+              userTouchedEntryType.current = true
+              clearAiBadge('entry_type')
             }}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               entryType === 'eating_out'
@@ -206,6 +210,8 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
             type="button"
             onClick={() => {
               setEntryType('home_cooked')
+              userTouchedEntryType.current = true
+              clearAiBadge('entry_type')
             }}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               entryType === 'home_cooked'

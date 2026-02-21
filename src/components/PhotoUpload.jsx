@@ -13,7 +13,7 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
     }
   }, [previewUrl, existingUrl])
 
-  function handleFileChange(e) {
+  async function handleFileChange(e) {
     const file = e.target.files[0]
     if (!file) return
 
@@ -30,12 +30,27 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
     if (isHeicFile) {
       setIsHeicPreview(true)
       setPreviewUrl(null)
+      onFileSelect(file)
+      try {
+        const heic2any = (await import('heic2any')).default
+        const jpegBlob = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: 0.5,
+        })
+        const blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob
+        const url = URL.createObjectURL(blob)
+        setPreviewUrl(url)
+        setIsHeicPreview(false)
+      } catch {
+        // Preview conversion failed — placeholder stays, analysis still runs
+      }
     } else {
       setIsHeicPreview(false)
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
+      onFileSelect(file)
     }
-    onFileSelect(file)
   }
 
   function handleClear() {
@@ -51,9 +66,9 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
   if (previewUrl || isHeicPreview) {
     return (
       <div className="relative mb-4">
-        {isHeicPreview ? (
+        {isHeicPreview && !previewUrl ? (
           <div className="w-full h-48 rounded-lg bg-stone-100 flex items-center justify-center text-stone-400 text-sm">
-            HEIC photo selected — preview not available in this browser
+            Converting photo...
           </div>
         ) : (
           <img

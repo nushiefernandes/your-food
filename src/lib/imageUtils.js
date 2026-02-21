@@ -12,18 +12,29 @@ function toJpegName(originalName) {
   return `${base}.jpg`
 }
 
-export function resizeForAnalysis(file) {
+const MAX_HEIC_BYTES = 20 * 1024 * 1024
+
+export async function resizeForAnalysis(file) {
+  if (!file) throw new Error('No file provided')
+
+  if (isHeic(file)) {
+    if (file.size > MAX_HEIC_BYTES) {
+      throw new Error('file_too_large')
+    }
+    const heic2any = (await import('heic2any')).default
+    const jpegBlob = await heic2any({
+      blob: file,
+      toType: 'image/jpeg',
+      quality: 0.8,
+    })
+    file = new File(
+      [Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob],
+      toJpegName(file.name),
+      { type: 'image/jpeg' }
+    )
+  }
+
   return new Promise((resolve, reject) => {
-    if (!file) {
-      reject(new Error('No file provided'))
-      return
-    }
-
-    if (isHeic(file)) {
-      reject(new Error('heic_unsupported'))
-      return
-    }
-
     const image = new Image()
     const objectUrl = URL.createObjectURL(file)
 

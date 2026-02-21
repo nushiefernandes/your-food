@@ -4,7 +4,7 @@ import { resizeForAnalysis } from '../lib/imageUtils';
 import { uploadPhoto, deletePhoto } from '../lib/storage';
 import { analyzeDishPhoto, filterByConfidence } from '../lib/analysis';
 
-const AI_FIELDS = new Set(['dish_name', 'cuisine_type']);
+const AI_FIELDS = new Set(['dish_name', 'cuisine_type', 'entry_type']);
 
 const IDLE_STATE = {
   status: 'idle',
@@ -129,7 +129,7 @@ export function usePhotoAnalysis() {
       });
     } catch (err) {
       if (abortRef.current !== requestId) return;
-      const errorCode = err?.message === 'heic_unsupported' ? 'heic_unsupported' : 'resize_failed';
+      const errorCode = err?.message === 'file_too_large' ? 'file_too_large' : 'resize_failed';
       setAnalysis((prev) => {
         if (abortRef.current !== requestId) return prev;
         return {
