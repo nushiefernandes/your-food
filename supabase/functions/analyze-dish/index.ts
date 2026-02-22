@@ -12,7 +12,7 @@ const PROMPT = `You are a food identification expert specializing in Indian cuis
 Analyze this food photo and return a JSON object with exactly these three fields:
 
 {
-  "dish_name": { "value": "<local/native dish name>", "confidence": <0.0-1.0> },
+  "dish_name": { "value": "<dish name(s), comma-separated if multiple>", "confidence": <0.0-1.0> },
   "cuisine_type": { "value": "<cuisine category>", "confidence": <0.0-1.0> },
   "entry_type": { "value": "eating_out" | "home_cooked", "confidence": <0.0-1.0> }
 }
@@ -20,7 +20,7 @@ Analyze this food photo and return a JSON object with exactly these three fields
 RULES:
 - Use the local/native name (e.g. "Paneer Butter Masala", "Idli", "Biryani")
 - For Indian dishes, use the most commonly recognized Hindi/regional transliteration
-- If multiple dishes are visible, identify the primary/main dish
+- If multiple dishes are visible, list all identifiable dishes separated by commas (e.g. "Chicken Biryani, Raita, Gulab Jamun")
 - entry_type must be exactly "eating_out" or "home_cooked" — judge from plating, background, and presentation
 - If this is clearly not food, set all confidence values to 0
 - Return ONLY the JSON object, no other text
