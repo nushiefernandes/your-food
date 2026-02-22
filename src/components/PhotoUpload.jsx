@@ -30,20 +30,27 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
     if (isHeicFile) {
       setIsHeicPreview(true)
       setPreviewUrl(null)
-      onFileSelect(file)
       try {
         const heic2any = (await import('heic2any')).default
         const jpegBlob = await heic2any({
           blob: file,
           toType: 'image/jpeg',
-          quality: 0.5,
+          quality: 0.8,
         })
         const blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob
+        const convertedFile = new File(
+          [blob],
+          file.name.replace(/\.[^/.]+$/, '.jpg'),
+          { type: 'image/jpeg', lastModified: Date.now() }
+        )
         const url = URL.createObjectURL(blob)
         setPreviewUrl(url)
         setIsHeicPreview(false)
+        onFileSelect(convertedFile)
       } catch {
-        // Preview conversion failed — placeholder stays, analysis still runs
+        setIsHeicPreview(false)
+        setPreviewUrl(null)
+        onFileSelect(file)
       }
     } else {
       setIsHeicPreview(false)

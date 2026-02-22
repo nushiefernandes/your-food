@@ -143,6 +143,11 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
           Could not process this photo. Try a different image.
         </p>
       )}
+      {analysis?.error === 'file_too_large' && (
+        <p className="text-xs text-red-500 mt-1">
+          This photo is too large. Try a smaller image (under 20MB).
+        </p>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
