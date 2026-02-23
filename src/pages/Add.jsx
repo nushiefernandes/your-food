@@ -7,7 +7,7 @@ import EntryForm from '../components/EntryForm'
 
 function Add() {
   const navigate = useNavigate()
-  const { analysis, analyzePhoto, clearAnalysis } = usePhotoAnalysis()
+  const { analysis, analyzePhoto, clearAnalysis, claimUpload } = usePhotoAnalysis()
 
   function handlePhotoSelected(file) {
     analyzePhoto(file)
@@ -24,6 +24,7 @@ function Add() {
     if (analysis?.uploadResult) {
       photoUrl = analysis.uploadResult.url
       photoPath = analysis.uploadResult.path
+      claimUpload()
     } else if (formData.photoFile) {
       const { url, path, error: uploadError } = await uploadPhoto(formData.photoFile)
       if (uploadError) throw uploadError

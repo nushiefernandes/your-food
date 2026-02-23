@@ -12,7 +12,7 @@ function Edit() {
   const [entry, setEntry] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const { analysis, analyzePhoto, clearAnalysis } = usePhotoAnalysis()
+  const { analysis, analyzePhoto, clearAnalysis, claimUpload } = usePhotoAnalysis()
 
   useEffect(() => {
     async function fetchEntry() {
@@ -42,6 +42,7 @@ function Edit() {
     if (analysis?.uploadResult) {
       photoUrl = analysis.uploadResult.url
       photoPath = analysis.uploadResult.path
+      claimUpload()
     } else if (formData.photoFile) {
       const { url, path, error: uploadError } = await uploadPhoto(formData.photoFile)
       if (uploadError) throw uploadError

@@ -153,5 +153,9 @@ export function usePhotoAnalysis() {
     setAnalysis(IDLE_STATE);
   }, []);
 
-  return { analysis, analyzePhoto, clearAnalysis };
+  const claimUpload = useCallback(() => {
+    latestUploadPathRef.current = null;
+  }, []);
+
+  return { analysis, analyzePhoto, clearAnalysis, claimUpload };
 }
