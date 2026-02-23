@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 const MOCK_AI = import.meta.env.VITE_MOCK_AI === 'true'
-const TIMEOUT_MS = 8000
+const TIMEOUT_MS = 30000
 
 function delay(ms) {
   return new Promise((resolve) => {
@@ -42,6 +42,7 @@ export async function analyzeDishPhoto(photoPath) {
       signal: controller.signal
     }).then(({ data, error }) => {
       if (error || data?.error) {
+        console.error('[analysis] Edge Function error:', { error, dataError: data?.error, data })
         return { suggestions: null, error: data?.error || 'api_error' }
       }
 
@@ -54,6 +55,7 @@ export async function analyzeDishPhoto(photoPath) {
 
     return await Promise.race([invokePromise, timeoutPromise])
   } catch (err) {
+    console.error('[analysis] invoke failed:', err)
     if (err && err.name === 'AbortError') {
       return { suggestions: null, error: 'timeout' }
     }

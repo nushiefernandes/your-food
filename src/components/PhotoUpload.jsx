@@ -47,7 +47,8 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
         setPreviewUrl(url)
         setIsHeicPreview(false)
         onFileSelect(convertedFile)
-      } catch {
+      } catch (err) {
+        console.error('[PhotoUpload] HEIC conversion failed:', err)
         setIsHeicPreview(false)
         setPreviewUrl(null)
         onFileSelect(file)

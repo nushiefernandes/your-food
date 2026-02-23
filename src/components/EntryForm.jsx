@@ -148,6 +148,11 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
           This photo is too large. Try a smaller image (under 20MB).
         </p>
       )}
+      {analysis?.status === 'error' && analysis?.error && analysis.error !== 'resize_failed' && analysis.error !== 'file_too_large' && (
+        <p className="text-xs text-red-500 mt-1">
+          Could not analyze this photo. You can still fill in the details manually.
+        </p>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">

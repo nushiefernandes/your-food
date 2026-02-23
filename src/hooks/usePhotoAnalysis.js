@@ -92,6 +92,7 @@ export function usePhotoAnalysis() {
       if (abortRef.current !== requestId) return;
 
       if (result?.error) {
+        console.error('[usePhotoAnalysis] analysis error:', result.error)
         setAnalysis((prev) => {
           if (abortRef.current !== requestId) return prev;
           return {
@@ -128,6 +129,7 @@ export function usePhotoAnalysis() {
         };
       });
     } catch (err) {
+      console.error('[usePhotoAnalysis] pipeline error:', err)
       if (abortRef.current !== requestId) return;
       const errorCode = err?.message === 'file_too_large' ? 'file_too_large' : 'resize_failed';
       setAnalysis((prev) => {

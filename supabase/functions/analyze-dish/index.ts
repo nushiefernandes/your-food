@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
     const base64 = arrayBufferToBase64(arrayBuffer)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 8000)
+    const timeoutId = setTimeout(() => controller.abort(), 25000)
     const start = Date.now()
 
     let geminiResponse: Response
@@ -172,6 +172,7 @@ Deno.serve(async (req) => {
               temperature: 0.2,
               maxOutputTokens: 512,
               responseMimeType: "application/json",
+              thinking_config: { thinking_budget: 0 },
             },
           }),
         },
