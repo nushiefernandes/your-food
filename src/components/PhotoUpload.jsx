@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
+import { isHeic } from '../lib/imageUtils'
 
 function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
   const [previewUrl, setPreviewUrl] = useState(existingUrl || null)
   const [isHeicPreview, setIsHeicPreview] = useState(false)
+  const [conversionError, setConversionError] = useState(null)
   const inputRef = useRef(null)
+  const selectionIdRef = useRef(0)
 
   useEffect(() => {
     return () => {
@@ -14,29 +17,45 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
   }, [previewUrl, existingUrl])
 
   async function handleFileChange(e) {
+    const currentId = selectionIdRef.current + 1
+    selectionIdRef.current = currentId
+
     const file = e.target.files[0]
     if (!file) return
+
+    setConversionError(null)
 
     if (previewUrl && previewUrl !== existingUrl) {
       URL.revokeObjectURL(previewUrl)
     }
 
-    const isHeicFile =
-      file.type === 'image/heic' ||
-      file.type === 'image/heif' ||
-      /\.heic$/i.test(file.name) ||
-      /\.heif$/i.test(file.name)
+    const isHeicFile = isHeic(file)
 
     if (isHeicFile) {
       setIsHeicPreview(true)
       setPreviewUrl(null)
+      let timeoutId
       try {
         const heic2any = (await import('heic2any')).default
-        const jpegBlob = await heic2any({
-          blob: file,
-          toType: 'image/jpeg',
-          quality: 0.8,
+        if (selectionIdRef.current !== currentId) return
+
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('heic_timeout'))
+          }, 15000)
         })
+
+        const jpegBlob = await Promise.race([
+          heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.8,
+          }),
+          timeoutPromise,
+        ])
+        clearTimeout(timeoutId)
+        if (selectionIdRef.current !== currentId) return
+
         const blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob
         const convertedFile = new File(
           [blob],
@@ -48,10 +67,20 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
         setIsHeicPreview(false)
         onFileSelect(convertedFile)
       } catch (err) {
-        console.error('[PhotoUpload] HEIC conversion failed:', err)
+        if (typeof timeoutId !== 'undefined') {
+          clearTimeout(timeoutId)
+        }
+        if (selectionIdRef.current !== currentId) return
+        if (import.meta.env.DEV) {
+          console.error('[PhotoUpload] HEIC conversion failed:', err)
+        }
         setIsHeicPreview(false)
         setPreviewUrl(null)
-        onFileSelect(file)
+        setConversionError(
+          err?.message === 'heic_timeout'
+            ? 'Photo conversion took too long. Try a JPEG instead.'
+            : 'Could not convert this photo. Try a JPEG instead.'
+        )
       }
     } else {
       setIsHeicPreview(false)
@@ -62,11 +91,13 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
   }
 
   function handleClear() {
+    selectionIdRef.current += 1
     if (previewUrl && previewUrl !== existingUrl) {
       URL.revokeObjectURL(previewUrl)
     }
     setPreviewUrl(null)
     setIsHeicPreview(false)
+    setConversionError(null)
     if (inputRef.current) inputRef.current.value = ''
     onClear()
   }
@@ -113,6 +144,9 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
         onChange={handleFileChange}
         className="hidden"
       />
+      {conversionError && (
+        <p className="text-xs text-red-500 mt-2">{conversionError}</p>
+      )}
     </div>
   )
 }

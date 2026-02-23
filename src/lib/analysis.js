@@ -42,7 +42,11 @@ export async function analyzeDishPhoto(photoPath) {
       signal: controller.signal
     }).then(({ data, error }) => {
       if (error || data?.error) {
-        console.error('[analysis] Edge Function error:', { error, dataError: data?.error, data })
+        if (import.meta.env.DEV) {
+          console.error('[analysis] Edge Function error:', { error, dataError: data?.error, data })
+        } else {
+          console.error('[analysis] error:', data?.error || 'api_error')
+        }
         return { suggestions: null, error: data?.error || 'api_error' }
       }
 
@@ -55,7 +59,11 @@ export async function analyzeDishPhoto(photoPath) {
 
     return await Promise.race([invokePromise, timeoutPromise])
   } catch (err) {
-    console.error('[analysis] invoke failed:', err)
+    if (import.meta.env.DEV) {
+      console.error('[analysis] invoke failed:', err)
+    } else {
+      console.error('[analysis] error:', err?.code || 'api_error')
+    }
     if (err && err.name === 'AbortError') {
       return { suggestions: null, error: 'timeout' }
     }

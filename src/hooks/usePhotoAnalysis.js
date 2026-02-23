@@ -92,7 +92,11 @@ export function usePhotoAnalysis() {
       if (abortRef.current !== requestId) return;
 
       if (result?.error) {
-        console.error('[usePhotoAnalysis] analysis error:', result.error)
+        if (import.meta.env.DEV) {
+          console.error('[usePhotoAnalysis] analysis error:', result.error)
+        } else {
+          console.error('[usePhotoAnalysis] error:', result.error)
+        }
         setAnalysis((prev) => {
           if (abortRef.current !== requestId) return prev;
           return {
@@ -129,7 +133,11 @@ export function usePhotoAnalysis() {
         };
       });
     } catch (err) {
-      console.error('[usePhotoAnalysis] pipeline error:', err)
+      if (import.meta.env.DEV) {
+        console.error('[usePhotoAnalysis] pipeline error:', err)
+      } else {
+        console.error('[usePhotoAnalysis] pipeline error:', err?.message)
+      }
       if (abortRef.current !== requestId) return;
       const errorCode = err?.message === 'file_too_large' ? 'file_too_large' : 'resize_failed';
       setAnalysis((prev) => {
@@ -153,6 +161,8 @@ export function usePhotoAnalysis() {
     setAnalysis(IDLE_STATE);
   }, []);
 
+  // Call after using uploadResult in a saved entry.
+  // Prevents cleanup from deleting the photo on unmount.
   const claimUpload = useCallback(() => {
     latestUploadPathRef.current = null;
   }, []);
