@@ -36,7 +36,7 @@ export function usePhotoAnalysis() {
     };
   }, []);
 
-  const analyzePhoto = useCallback(async (file) => {
+  const analyzePhoto = useCallback(async (file, orientation) => {
     const requestId = abortRef.current + 1;
     abortRef.current = requestId;
 
@@ -55,7 +55,7 @@ export function usePhotoAnalysis() {
     });
 
     try {
-      const resizedFile = await resizeForAnalysis(file);
+      const resizedFile = await resizeForAnalysis(file, orientation);
       if (abortRef.current !== requestId) return;
 
       const uploadResult = await uploadPhoto(resizedFile);

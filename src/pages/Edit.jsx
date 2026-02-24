@@ -27,8 +27,8 @@ function Edit() {
     fetchEntry()
   }, [id])
 
-  function handlePhotoSelected(file) {
-    analyzePhoto(file)
+  function handlePhotoSelected(file, orientation) {
+    analyzePhoto(file, orientation)
   }
 
   function handlePhotoClear() {
@@ -66,6 +66,8 @@ function Edit() {
       cuisine_type: formData.cuisineType || null,
       photo_url: photoUrl,
       photo_path: photoPath,
+      photo_lat: formData.photoLat,
+      photo_lng: formData.photoLng,
       ai_suggestions: analysis?.suggestions || null,
     })
 
