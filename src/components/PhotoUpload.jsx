@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { isHeic } from '../lib/imageUtils'
+import { isHeic, extractExifData } from '../lib/imageUtils'
 
 function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
   const [previewUrl, setPreviewUrl] = useState(existingUrl || null)
@@ -22,6 +22,9 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
 
     const file = e.target.files[0]
     if (!file) return
+
+    const exifData = await extractExifData(file)
+    if (selectionIdRef.current !== currentId) return
 
     setConversionError(null)
 
@@ -65,7 +68,7 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
         const url = URL.createObjectURL(blob)
         setPreviewUrl(url)
         setIsHeicPreview(false)
-        onFileSelect(convertedFile)
+        onFileSelect(convertedFile, exifData)
       } catch (err) {
         if (typeof timeoutId !== 'undefined') {
           clearTimeout(timeoutId)
@@ -86,7 +89,7 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
       setIsHeicPreview(false)
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
-      onFileSelect(file)
+      onFileSelect(file, exifData)
     }
   }
 
