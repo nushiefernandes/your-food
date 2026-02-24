@@ -7,12 +7,41 @@ export function isHeic(file) {
   )
 }
 
+export async function extractExifData(file) {
+  try {
+    const exifr = await import('exifr')
+    const result = await exifr.parse(file, {
+      pick: ['DateTimeOriginal', 'Orientation'],
+      gps: true,
+    })
+
+    if (!result) return null
+
+    const timestamp =
+      result.DateTimeOriginal instanceof Date &&
+      !Number.isNaN(result.DateTimeOriginal.getTime())
+        ? result.DateTimeOriginal
+        : null
+
+    const latitude = result.latitude ?? result.GPSLatitude
+    const longitude = result.longitude ?? result.GPSLongitude
+
+    const lat = typeof latitude === 'number' ? latitude : null
+    const lng = typeof longitude === 'number' ? longitude : null
+    const orientation = typeof result.Orientation === 'number' ? result.Orientation : null
+
+    return { timestamp, lat, lng, orientation }
+  } catch (error) {
+    return null
+  }
+}
+
 function toJpegName(originalName) {
   const base = originalName.replace(/\.[^/.]+$/, '')
   return `${base}.jpg`
 }
 
-export async function resizeForAnalysis(file) {
+export async function resizeForAnalysis(file, orientation) {
   if (!file) throw new Error('No file provided')
 
   return new Promise((resolve, reject) => {
@@ -31,13 +60,55 @@ export async function resizeForAnalysis(file) {
       const targetHeight = Math.round(height * scale)
 
       const canvas = document.createElement('canvas')
-      canvas.width = targetWidth
-      canvas.height = targetHeight
+      const resolvedOrientation = typeof orientation === 'number' ? orientation : null
+      const shouldSwapDimensions =
+        resolvedOrientation === 5 ||
+        resolvedOrientation === 6 ||
+        resolvedOrientation === 7 ||
+        resolvedOrientation === 8
+
+      canvas.width = shouldSwapDimensions ? targetHeight : targetWidth
+      canvas.height = shouldSwapDimensions ? targetWidth : targetHeight
 
       const ctx = canvas.getContext('2d')
       if (!ctx) {
         reject(new Error('Canvas not supported'))
         return
+      }
+
+      if (resolvedOrientation && resolvedOrientation !== 1) {
+        switch (resolvedOrientation) {
+          case 2:
+            ctx.translate(canvas.width, 0)
+            ctx.scale(-1, 1)
+            break
+          case 3:
+            ctx.translate(canvas.width, canvas.height)
+            ctx.rotate(Math.PI)
+            break
+          case 4:
+            ctx.translate(0, canvas.height)
+            ctx.scale(1, -1)
+            break
+          case 5:
+            ctx.translate(canvas.width, 0)
+            ctx.rotate(Math.PI / 2)
+            ctx.scale(-1, 1)
+            break
+          case 6:
+            ctx.translate(canvas.width, 0)
+            ctx.rotate(Math.PI / 2)
+            break
+          case 7:
+            ctx.translate(0, canvas.height)
+            ctx.rotate(-Math.PI / 2)
+            ctx.scale(-1, 1)
+            break
+          case 8:
+            ctx.translate(0, canvas.height)
+            ctx.rotate(-Math.PI / 2)
+            break
+        }
       }
 
       ctx.drawImage(image, 0, 0, targetWidth, targetHeight)

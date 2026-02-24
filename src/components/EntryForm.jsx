@@ -33,6 +33,7 @@ function toDatetimeLocal(date) {
 
 function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelected, onPhotoClear }) {
   const [photoFile, setPhotoFile] = useState(null)
+  const [exifData, setExifData] = useState(null)
   const [dishName, setDishName] = useState(initialData?.dish_name || '')
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
@@ -46,6 +47,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   const [ateAt, setAteAt] = useState(
     toDatetimeLocal(initialData?.ate_at || new Date())
   )
+  const [ateAtTouched, setAteAtTouched] = useState(!!initialData?.ate_at)
   const [cost, setCost] = useState(initialData?.cost?.toString() || '')
   const [companions, setCompanions] = useState(initialData?.companions || '')
   const [rating, setRating] = useState(initialData?.rating || null)
@@ -107,6 +109,8 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
         venueName: entryType === 'eating_out' ? venueName.trim() : '',
         ateAt: new Date(ateAt).toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+        photoLat: exifData?.lat ?? null,
+        photoLng: exifData?.lng ?? null,
         cost: cost ? parseFloat(cost) : null,
         companions: companions.trim(),
         rating,
@@ -126,9 +130,13 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
     <form onSubmit={handleSubmit} className="space-y-4">
       <PhotoUpload
         existingUrl={initialData?.photo_url}
-        onFileSelect={(file) => {
+        onFileSelect={(file, exifData) => {
           setPhotoFile(file)
-          if (onPhotoSelected) onPhotoSelected(file)
+          if (exifData?.timestamp && !ateAtTouched) {
+            setAteAt(toDatetimeLocal(exifData.timestamp))
+          }
+          setExifData(exifData)
+          if (onPhotoSelected) onPhotoSelected(file, exifData?.orientation)
         }}
         onClear={() => {
           setPhotoFile(null)
@@ -256,7 +264,10 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
         <input
           type="datetime-local"
           value={ateAt}
-          onChange={(e) => setAteAt(e.target.value)}
+          onChange={(e) => {
+            setAteAt(e.target.value)
+            setAteAtTouched(true)
+          }}
           className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
         />
       </div>
