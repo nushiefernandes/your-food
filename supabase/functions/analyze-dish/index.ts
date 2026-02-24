@@ -2,7 +2,11 @@
 import "@supabase/functions-js/edge-runtime.d.ts"
 
 const IS_DEV = Deno.env.get("ENV") === "development"
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || (IS_DEV ? "*" : "")
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+if (IS_DEV) ALLOWED_ORIGINS.push("*")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || ""
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || ""
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB
@@ -26,19 +30,30 @@ RULES:
 - Return ONLY the JSON object, no other text
 `
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+function corsHeaders(origin: string) {
+  const allowedOrigin = ALLOWED_ORIGINS.includes("*")
+    ? "*"
+    : ALLOWED_ORIGINS.includes(origin)
+      ? origin
+      : ""
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  }
 }
 
-function jsonResponse(body: Record<string, unknown>, status = 200) {
+function jsonResponse(
+  body: Record<string, unknown>,
+  origin: string,
+  status = 200,
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json",
-      ...CORS_HEADERS,
+      ...corsHeaders(origin),
     },
   })
 }
@@ -71,8 +86,10 @@ function allConfidenceZero(parsed: Record<string, unknown>): boolean {
 }
 
 Deno.serve(async (req) => {
-  // Fail-closed CORS: reject non-OPTIONS requests when ALLOWED_ORIGIN is not configured
-  if (!ALLOWED_ORIGIN) {
+  const origin = req.headers.get("origin") || ""
+
+  // Fail-closed CORS: reject when no origins configured
+  if (ALLOWED_ORIGINS.length === 0) {
     console.error("ALLOWED_ORIGIN not set — refusing request. Set ENV=development for local dev.")
     return new Response(JSON.stringify({ suggestions: null, error: "api_error" }), {
       status: 500,
@@ -81,11 +98,11 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS })
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
   }
 
   if (req.method !== "POST") {
-    return jsonResponse({ suggestions: null, error: "api_error" })
+    return jsonResponse({ suggestions: null, error: "api_error" }, origin)
   }
 
   try {
@@ -106,13 +123,13 @@ Deno.serve(async (req) => {
     const photoPath = body?.photoPath
 
     if (typeof photoPath !== "string" || !isValidPhotoPath(photoPath)) {
-      return jsonResponse({ suggestions: null, error: "invalid_path" })
+      return jsonResponse({ suggestions: null, error: "invalid_path" }, origin)
     }
 
     // Ownership check: photoPath must start with the authenticated user's ID
     if (userId && !photoPath.startsWith(userId + "/")) {
       console.error("Ownership check failed:", photoPath, "for user", userId)
-      return jsonResponse({ suggestions: null, error: "invalid_path" })
+      return jsonResponse({ suggestions: null, error: "invalid_path" }, origin)
     }
 
     const storageUrl =
@@ -121,14 +138,14 @@ Deno.serve(async (req) => {
     const imageResponse = await fetch(storageUrl)
     if (!imageResponse.ok) {
       console.error("Storage fetch failed", imageResponse.status)
-      return jsonResponse({ suggestions: null, error: "api_error" })
+      return jsonResponse({ suggestions: null, error: "api_error" }, origin)
     }
 
     // Size limit: reject images larger than 5MB (defense-in-depth; client resizes to ~200KB)
     const contentLength = parseInt(imageResponse.headers.get("content-length") || "0", 10)
     if (contentLength > MAX_IMAGE_BYTES) {
       console.error("Image too large:", contentLength, "bytes")
-      return jsonResponse({ suggestions: null, error: "payload_too_large" })
+      return jsonResponse({ suggestions: null, error: "payload_too_large" }, origin)
     }
 
     const contentType = imageResponse.headers.get("content-type") ||
@@ -138,7 +155,7 @@ Deno.serve(async (req) => {
     // Double-check actual size (content-length can be missing or wrong)
     if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
       console.error("Image body too large:", arrayBuffer.byteLength, "bytes")
-      return jsonResponse({ suggestions: null, error: "payload_too_large" })
+      return jsonResponse({ suggestions: null, error: "payload_too_large" }, origin)
     }
     const base64 = arrayBufferToBase64(arrayBuffer)
 
@@ -179,10 +196,10 @@ Deno.serve(async (req) => {
       )
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        return jsonResponse({ suggestions: null, error: "timeout" })
+        return jsonResponse({ suggestions: null, error: "timeout" }, origin)
       }
       console.error("Gemini fetch failed", error)
-      return jsonResponse({ suggestions: null, error: "api_error" })
+      return jsonResponse({ suggestions: null, error: "api_error" }, origin)
     } finally {
       clearTimeout(timeoutId)
     }
@@ -191,14 +208,14 @@ Deno.serve(async (req) => {
 
     if (!geminiResponse.ok) {
       console.error("Gemini API error", geminiResponse.status)
-      return jsonResponse({ suggestions: null, error: "api_error" })
+      return jsonResponse({ suggestions: null, error: "api_error" }, origin)
     }
 
     const geminiJson = await geminiResponse.json()
     const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text
     if (typeof text !== "string") {
       console.error("Gemini response missing text")
-      return jsonResponse({ suggestions: null, error: "api_error" })
+      return jsonResponse({ suggestions: null, error: "api_error" }, origin)
     }
 
     let parsed: Record<string, unknown>
@@ -206,20 +223,20 @@ Deno.serve(async (req) => {
       parsed = JSON.parse(text)
     } catch (error) {
       console.error("Gemini JSON parse failed", error)
-      return jsonResponse({ suggestions: null, error: "api_error" })
+      return jsonResponse({ suggestions: null, error: "api_error" }, origin)
     }
 
     if (allConfidenceZero(parsed)) {
-      return jsonResponse({ suggestions: null, error: "not_food" })
+      return jsonResponse({ suggestions: null, error: "not_food" }, origin)
     }
 
     return jsonResponse({
       suggestions: parsed,
       model: "gemini-2.5-flash",
       latency_ms: latencyMs,
-    })
+    }, origin)
   } catch (error) {
     console.error("Unhandled error", error)
-    return jsonResponse({ suggestions: null, error: "api_error" })
+    return jsonResponse({ suggestions: null, error: "api_error" }, origin)
   }
 })
