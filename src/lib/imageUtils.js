@@ -11,7 +11,7 @@ export async function extractExifData(file) {
   try {
     const exifr = await import('exifr')
     const result = await exifr.parse(file, {
-      pick: ['DateTimeOriginal', 'Orientation'],
+      pick: ['DateTimeOriginal', 'Orientation', 'GPSLatitude', 'GPSLongitude', 'GPSLatitudeRef', 'GPSLongitudeRef'],
       gps: true,
     })
 
