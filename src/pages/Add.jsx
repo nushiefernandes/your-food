@@ -1,9 +1,46 @@
 import { useNavigate } from 'react-router-dom'
-import { createEntry } from '../lib/entries'
+import { createEntry, updateEntry } from '../lib/entries'
 import { uploadPhoto } from '../lib/storage'
+import { fetchWeather } from '../lib/weather'
 import { usePhotoAnalysis } from '../hooks/usePhotoAnalysis'
 import PageShell from '../components/PageShell'
 import EntryForm from '../components/EntryForm'
+
+async function fetchWeatherAndNeighbourhood(entryId, lat, lng, ateAt) {
+  try {
+    const updates = {}
+
+    const weather = await fetchWeather(lat, lng, ateAt)
+    if (weather) updates.weather = weather
+
+    // Reverse geocode via Nominatim (free, no key)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`,
+        {
+          headers: { 'User-Agent': 'YourFood/1.0' },
+          signal: AbortSignal.timeout(5000),
+        }
+      )
+      if (res.ok) {
+        const geo = await res.json()
+        const parts = [
+          geo.address?.suburb || geo.address?.neighbourhood || geo.address?.quarter,
+          geo.address?.city || geo.address?.town || geo.address?.village,
+        ].filter(Boolean)
+        if (parts.length > 0) updates.neighbourhood = parts.join(', ')
+      }
+    } catch {
+      // Nominatim failed — skip neighbourhood
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await updateEntry(entryId, updates)
+    }
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn('[Add] weather/neighbourhood failed:', err?.message)
+  }
+}
 
 function Add() {
   const navigate = useNavigate()
@@ -32,7 +69,7 @@ function Add() {
       photoPath = path
     }
 
-    const { error } = await createEntry({
+    const { data: entry, error } = await createEntry({
       dish_name: formData.dishName,
       venue_name: formData.venueName || null,
       entry_type: formData.entryType,
@@ -50,10 +87,17 @@ function Add() {
       photo_path: photoPath,
       photo_lat: formData.photoLat,
       photo_lng: formData.photoLng,
+      place_id: formData.placeId || null,
       ai_suggestions: analysis?.suggestions || null,
     })
 
     if (error) throw error
+
+    // Fire-and-forget: weather + neighbourhood (never blocks navigation)
+    if (entry?.id && formData.photoLat && formData.photoLng) {
+      fetchWeatherAndNeighbourhood(entry.id, formData.photoLat, formData.photoLng, formData.ateAt)
+    }
+
     navigate('/?saved=1')
   }
 

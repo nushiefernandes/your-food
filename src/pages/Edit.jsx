@@ -68,6 +68,7 @@ function Edit() {
       photo_path: photoPath,
       photo_lat: formData.photoLat,
       photo_lng: formData.photoLng,
+      place_id: formData.placeId || null,
       ai_suggestions: analysis?.suggestions || null,
     })
 

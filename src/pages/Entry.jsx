@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getEntry, deleteEntry } from '../lib/entries'
+import { getEntry, deleteEntry, updateEntry } from '../lib/entries'
+import { supabase } from '../lib/supabase'
+import { fetchWeather, weatherDescription } from '../lib/weather'
 import { deletePhoto } from '../lib/storage'
 import { useAuth } from '../contexts/AuthContext'
 import PageShell from '../components/PageShell'
@@ -42,18 +44,66 @@ function Entry() {
   const [error, setError] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [visitCount, setVisitCount] = useState(null)
+  const weatherAttemptedRef = useRef(null)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchEntry() {
       const { data, error } = await getEntry(id)
       if (error) {
         setError(error.message)
       } else {
         setEntry(data)
+        // Fetch visit count if entry has a place_id
+        if (data?.place_id) {
+          supabase
+            .from('entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('place_id', data.place_id)
+            .then(({ count }) => {
+              if (!cancelled && count != null) setVisitCount(count)
+            })
+        }
+        // Lazy-fill neighbourhood for old entries with coordinates but no neighbourhood
+        if (data?.photo_lat && data?.photo_lng && !data?.neighbourhood) {
+          fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${data.photo_lat}&lon=${data.photo_lng}&format=json&zoom=16`,
+            { headers: { 'User-Agent': 'YourFood/1.0' }, signal: AbortSignal.timeout(5000) }
+          )
+            .then((res) => res.ok ? res.json() : null)
+            .then((geo) => {
+              if (cancelled || !geo?.address) return
+              const parts = [
+                geo.address.suburb || geo.address.neighbourhood || geo.address.quarter,
+                geo.address.city || geo.address.town || geo.address.village,
+              ].filter(Boolean)
+              if (parts.length > 0) {
+                const neighbourhood = parts.join(', ')
+                setEntry((prev) => ({ ...prev, neighbourhood }))
+                updateEntry(data.id, { neighbourhood })
+              }
+            })
+            .catch(() => {})
+        }
+        // Lazy-fill weather (once per entry, skip if already attempted)
+        if (data?.photo_lat && data?.photo_lng && data?.ate_at && !data?.weather && weatherAttemptedRef.current !== data.id) {
+          weatherAttemptedRef.current = data.id
+          fetchWeather(data.photo_lat, data.photo_lng, data.ate_at)
+            .then((weather) => {
+              if (cancelled) return
+              if (weather) {
+                setEntry((prev) => ({ ...prev, weather }))
+                updateEntry(data.id, { weather })
+              }
+            })
+            .catch(() => {})
+        }
       }
       setLoading(false)
     }
     fetchEntry()
+    return () => { cancelled = true }
   }, [id])
 
   async function handleDelete() {
@@ -148,7 +198,31 @@ function Entry() {
         {entry.venue_name && (
           <div>
             <p className="text-xs text-stone-400 uppercase tracking-wide">Where</p>
-            <p className="text-stone-700">{entry.venue_name}</p>
+            <p className="text-stone-700">
+              {entry.venue_name}
+              {visitCount > 1 && (
+                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                  Visit #{visitCount}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
+        {entry.neighbourhood && (
+          <div>
+            <p className="text-xs text-stone-400 uppercase tracking-wide">Area</p>
+            <p className="text-stone-700">{entry.neighbourhood}</p>
+          </div>
+        )}
+
+        {entry.weather && (
+          <div>
+            <p className="text-xs text-stone-400 uppercase tracking-wide">Weather</p>
+            <p className="text-stone-700">
+              {entry.weather.temp_c != null && `${Math.round(entry.weather.temp_c)}°C`}
+              {entry.weather.weather_code != null && `, ${weatherDescription(entry.weather.weather_code)}`}
+            </p>
           </div>
         )}
 

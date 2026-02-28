@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import PhotoUpload from './PhotoUpload'
 import StarRating from './StarRating'
+import VenuePicker from './VenuePicker'
 
 const EATING_OUT_PROMPTS = [
   'Worth going back?',
@@ -39,6 +40,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
   const [showMore, setShowMore] = useState(initialData?.is_combo || false)
   const [venueName, setVenueName] = useState(initialData?.venue_name || '')
+  const [placeId, setPlaceId] = useState(initialData?.place_id || null)
   const [cuisineType, setCuisineType] = useState(initialData?.cuisine_type || '')
   const [recipeUrl, setRecipeUrl] = useState(initialData?.recipe_url || '')
   const [prepTime, setPrepTime] = useState(
@@ -111,6 +113,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
         photoLat: exifData?.lat ?? null,
         photoLng: exifData?.lng ?? null,
+        placeId,
         cost: cost ? parseFloat(cost) : null,
         companions: companions.trim(),
         rating,
@@ -247,12 +250,11 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
           <label className="block text-sm font-medium text-stone-700 mb-1">
             Where did you eat?
           </label>
-          <input
-            type="text"
+          <VenuePicker
             value={venueName}
-            onChange={(e) => setVenueName(e.target.value)}
-            placeholder="e.g. Mabrouk, Sarah's house, office party"
-            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white"
+            onChange={setVenueName}
+            onPlaceSelect={(place) => setPlaceId(place?.id || place?.google_place_id || null)}
+            coords={exifData?.lat ? { lat: exifData.lat, lng: exifData.lng } : null}
           />
         </div>
       )}
