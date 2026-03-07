@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockSupabase = {
-  functions: {
-    invoke: vi.fn(),
+const { mockSupabase } = vi.hoisted(() => ({
+  mockSupabase: {
+    functions: {
+      invoke: vi.fn(),
+    },
   },
-}
+}))
 
 vi.mock('./supabase', () => ({
   supabase: mockSupabase,

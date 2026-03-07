@@ -1,21 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockBucket = {
-  select: vi.fn(),
-  order: vi.fn(),
-  upsert: vi.fn(),
-  single: vi.fn(),
-}
-
-const mockSupabase = {
-  functions: {
-    invoke: vi.fn(),
+const { mockBucket, mockSupabase } = vi.hoisted(() => ({
+  mockBucket: {
+    select: vi.fn(),
+    order: vi.fn(),
+    upsert: vi.fn(),
+    single: vi.fn(),
   },
-  auth: {
-    getUser: vi.fn(),
+  mockSupabase: {
+    functions: {
+      invoke: vi.fn(),
+    },
+    auth: {
+      getUser: vi.fn(),
+    },
+    from: vi.fn(),
   },
-  from: vi.fn(() => mockBucket),
-}
+}))
 
 vi.mock('./supabase', () => ({
   supabase: mockSupabase,
@@ -40,6 +41,7 @@ describe('places client lib', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetBucketMocks()
+    mockSupabase.from.mockReturnValue(mockBucket)
   })
 
   it('searchNearby returns parsed places from Edge Function', async () => {

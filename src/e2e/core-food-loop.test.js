@@ -1,111 +1,115 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const state = {
-  entries: [],
-  photos: new Set(),
-  user: { id: 'user-e2e', email: 'e2e@example.com' },
-}
+const { state, mockSupabase } = vi.hoisted(() => {
+  const state = {
+    entries: [],
+    photos: new Set(),
+    user: { id: 'user-e2e', email: 'e2e@example.com' },
+  }
 
-function nextEntryId() {
-  return `entry-${state.entries.length + 1}`
-}
+  function nextEntryId() {
+    return `entry-${state.entries.length + 1}`
+  }
 
-function makeEntriesQueryBuilder() {
-  let operation = 'read'
-  let insertPayload = null
-  let updatePayload = null
-  let filterField = null
-  let filterValue = null
+  function makeEntriesQueryBuilder() {
+    let operation = 'read'
+    let insertPayload = null
+    let updatePayload = null
+    let filterField = null
+    let filterValue = null
 
-  const builder = {
-    select: vi.fn(() => builder),
-    order: vi.fn(async (field, opts) => {
-      const sorted = [...state.entries].sort((a, b) => {
-        if (a[field] === b[field]) return 0
-        if (opts?.ascending) return a[field] > b[field] ? 1 : -1
-        return a[field] > b[field] ? -1 : 1
-      })
-      return { data: sorted, error: null }
-    }),
-    eq: vi.fn((field, value) => {
-      filterField = field
-      filterValue = value
+    const builder = {
+      select: vi.fn(() => builder),
+      order: vi.fn(async (field, opts) => {
+        const sorted = [...state.entries].sort((a, b) => {
+          if (a[field] === b[field]) return 0
+          if (opts?.ascending) return a[field] > b[field] ? 1 : -1
+          return a[field] > b[field] ? -1 : 1
+        })
+        return { data: sorted, error: null }
+      }),
+      eq: vi.fn((field, value) => {
+        filterField = field
+        filterValue = value
 
-      if (operation === 'delete') {
-        const before = state.entries.length
-        state.entries = state.entries.filter((row) => row[field] !== value)
-        const deleted = before - state.entries.length
-        return Promise.resolve({ data: null, error: deleted >= 0 ? null : new Error('delete_failed') })
-      }
+        if (operation === 'delete') {
+          const before = state.entries.length
+          state.entries = state.entries.filter((row) => row[field] !== value)
+          const deleted = before - state.entries.length
+          return Promise.resolve({ data: null, error: deleted >= 0 ? null : new Error('delete_failed') })
+        }
 
-      return builder
-    }),
-    single: vi.fn(async () => {
-      if (operation === 'insert') {
-        const row = { id: nextEntryId(), ...insertPayload }
-        state.entries.push(row)
+        return builder
+      }),
+      single: vi.fn(async () => {
+        if (operation === 'insert') {
+          const row = { id: nextEntryId(), ...insertPayload }
+          state.entries.push(row)
+          return { data: row, error: null }
+        }
+
+        if (operation === 'update') {
+          const idx = state.entries.findIndex((row) => row[filterField] === filterValue)
+          if (idx === -1) return { data: null, error: { message: 'Not found' } }
+          state.entries[idx] = { ...state.entries[idx], ...updatePayload }
+          return { data: state.entries[idx], error: null }
+        }
+
+        const row = state.entries.find((item) => item[filterField] === filterValue)
+        if (!row) return { data: null, error: { message: 'Not found' } }
         return { data: row, error: null }
-      }
+      }),
+      insert: vi.fn((payload) => {
+        operation = 'insert'
+        insertPayload = payload
+        return builder
+      }),
+      update: vi.fn((payload) => {
+        operation = 'update'
+        updatePayload = payload
+        return builder
+      }),
+      delete: vi.fn(() => {
+        operation = 'delete'
+        return builder
+      }),
+    }
 
-      if (operation === 'update') {
-        const idx = state.entries.findIndex((row) => row[filterField] === filterValue)
-        if (idx === -1) return { data: null, error: { message: 'Not found' } }
-        state.entries[idx] = { ...state.entries[idx], ...updatePayload }
-        return { data: state.entries[idx], error: null }
-      }
+    return builder
+  }
 
-      const row = state.entries.find((item) => item[filterField] === filterValue)
-      if (!row) return { data: null, error: { message: 'Not found' } }
-      return { data: row, error: null }
+  const storageBucket = {
+    upload: vi.fn(async (path) => {
+      state.photos.add(path)
+      return { error: null }
     }),
-    insert: vi.fn((payload) => {
-      operation = 'insert'
-      insertPayload = payload
-      return builder
-    }),
-    update: vi.fn((payload) => {
-      operation = 'update'
-      updatePayload = payload
-      return builder
-    }),
-    delete: vi.fn(() => {
-      operation = 'delete'
-      return builder
+    getPublicUrl: vi.fn((path) => ({
+      data: { publicUrl: `https://cdn.example/${path}` },
+    })),
+    remove: vi.fn(async (paths) => {
+      paths.forEach((path) => state.photos.delete(path))
+      return { error: null }
     }),
   }
 
-  return builder
-}
+  const mockSupabase = {
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: state.user } })),
+    },
+    storage: {
+      from: vi.fn(() => storageBucket),
+    },
+    from: vi.fn((table) => {
+      if (table === 'entries') {
+        return makeEntriesQueryBuilder()
+      }
 
-const storageBucket = {
-  upload: vi.fn(async (path) => {
-    state.photos.add(path)
-    return { error: null }
-  }),
-  getPublicUrl: vi.fn((path) => ({
-    data: { publicUrl: `https://cdn.example/${path}` },
-  })),
-  remove: vi.fn(async (paths) => {
-    paths.forEach((path) => state.photos.delete(path))
-    return { error: null }
-  }),
-}
+      throw new Error(`Unexpected table access in E2E flow: ${table}`)
+    }),
+  }
 
-const mockSupabase = {
-  auth: {
-    getUser: vi.fn(async () => ({ data: { user: state.user } })),
-  },
-  storage: {
-    from: vi.fn(() => storageBucket),
-  },
-  from: vi.fn((table) => {
-    if (table === 'entries') {
-      return makeEntriesQueryBuilder()
-    }
-
-    throw new Error(`Unexpected table access in E2E flow: ${table}`)
-  }),
-}
+  return { state, mockSupabase }
+})
 
 vi.mock('../lib/supabase', () => ({
   supabase: mockSupabase,

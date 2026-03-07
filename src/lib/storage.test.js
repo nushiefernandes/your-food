@@ -1,19 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockBucket = {
-  upload: vi.fn(),
-  getPublicUrl: vi.fn(),
-  remove: vi.fn(),
-}
-
-const mockSupabase = {
-  auth: {
-    getUser: vi.fn(),
+const { mockBucket, mockSupabase } = vi.hoisted(() => ({
+  mockBucket: {
+    upload: vi.fn(),
+    getPublicUrl: vi.fn(),
+    remove: vi.fn(),
   },
-  storage: {
-    from: vi.fn(() => mockBucket),
+  mockSupabase: {
+    auth: {
+      getUser: vi.fn(),
+    },
+    storage: {
+      from: vi.fn(),
+    },
   },
-}
+}))
 
 vi.mock('./supabase', () => ({
   supabase: mockSupabase,
