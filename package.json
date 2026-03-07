@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:phase1": "vitest run src/lib/entries.test.js src/lib/storage.test.js src/e2e/core-food-loop.test.js",
+    "test:phase5": "vitest run src/lib/imageUtils.test.js src/lib/analysis.test.js",
+    "test:phase6": "vitest run src/lib/geo.test.js src/lib/places.test.js src/lib/places.client.test.js src/lib/weather.test.js",
+    "test:e2e": "vitest run src/e2e/**/*.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.2",
