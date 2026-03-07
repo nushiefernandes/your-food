@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { getEntries } from '../lib/entries'
+import { getDistinctCuisines, searchEntries } from '../lib/entries'
+import { useFilteredEntries } from '../hooks/useFilteredEntries'
 import { useAuth } from '../contexts/AuthContext'
 import EntryCard from '../components/EntryCard'
+import SearchBar from '../components/SearchBar'
+import FilterPanel from '../components/FilterPanel'
 
 const EMOJI_ROW = ['🍕', '🍜', '🌮', '🍛', '🍱']
 
@@ -22,27 +25,51 @@ function getRandomItem(items) {
 
 function Home() {
   const { user, signOut } = useAuth()
+  const { entries, loading, error, filters, setFilter, clearFilters, resultCount } = useFilteredEntries()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showToast, setShowToast] = useState(false)
-  const [entries, setEntries] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [cuisines, setCuisines] = useState([])
+  const [hasAnyEntries, setHasAnyEntries] = useState(null)
   const emptyStateHeadline = useMemo(
     () => getRandomItem(EMPTY_STATE_HEADLINES),
     []
   )
+  const hasActiveFilters = useMemo(
+    () => Boolean(
+      filters.q
+      || filters.entryType
+      || filters.minRating
+      || filters.dateFrom
+      || filters.dateTo
+      || filters.cuisine
+      || filters.venue
+      || (filters.sortBy && filters.sortBy !== 'ate_at')
+    ),
+    [filters]
+  )
 
   useEffect(() => {
-    async function fetchEntries() {
-      const { data, error } = await getEntries()
-      if (error) {
-        setError(error.message)
-      } else {
-        setEntries(data || [])
+    let active = true
+
+    async function fetchFilterData() {
+      const [cuisineValues, allEntriesResult] = await Promise.all([
+        getDistinctCuisines(),
+        searchEntries(),
+      ])
+
+      if (!active) return
+
+      setCuisines(cuisineValues || [])
+      if (!allEntriesResult.error) {
+        setHasAnyEntries((allEntriesResult.data || []).length > 0)
       }
-      setLoading(false)
     }
-    fetchEntries()
+
+    fetchFilterData()
+
+    return () => {
+      active = false
+    }
   }, [])
 
   useEffect(() => {
@@ -55,6 +82,15 @@ function Home() {
       return () => clearTimeout(timer)
     }
   }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (!loading && !error && !hasActiveFilters) {
+      setHasAnyEntries(entries.length > 0)
+    }
+  }, [loading, error, hasActiveFilters, entries.length])
+
+  const showEmptyState = !loading && !error && hasAnyEntries === false
+  const showNoMatches = !loading && !error && hasActiveFilters && resultCount === 0 && hasAnyEntries !== false
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -75,20 +111,35 @@ function Home() {
           A diary for everything you eat.
         </p>
 
-        {entries.length > 0 && (
-          <Link
-            to="/add"
-            className="inline-block bg-stone-900 text-white px-6 py-3 rounded-lg font-medium hover:bg-stone-800 transition-colors"
-          >
-            + Log a meal
-          </Link>
-        )}
+        <Link
+          to="/add"
+          className="inline-block bg-stone-900 text-white px-6 py-3 rounded-lg font-medium hover:bg-stone-800 transition-colors"
+        >
+          + Log a meal
+        </Link>
 
         {showToast && (
           <div className="mt-4 bg-green-50 border border-green-200 text-green-700 text-sm font-medium px-4 py-2 rounded-lg text-center transition-opacity duration-500">
             Meal saved!
           </div>
         )}
+
+        <div className="mt-4 space-y-3">
+          <SearchBar
+            value={filters.q}
+            onChange={(value) => setFilter('q', value)}
+            onClear={() => setFilter('q', '')}
+          />
+          <FilterPanel
+            filters={filters}
+            onFilterChange={setFilter}
+            onClear={clearFilters}
+            cuisines={cuisines}
+          />
+          {hasActiveFilters && !loading && !error && (
+            <p className="text-sm text-stone-500">{resultCount} meals found</p>
+          )}
+        </div>
 
         <div className="mt-8 space-y-3">
           {loading && (
@@ -97,7 +148,7 @@ function Home() {
           {error && (
             <p className="text-red-500 text-center py-8">{error}</p>
           )}
-          {!loading && !error && entries.length === 0 && (
+          {showEmptyState && (
             <div className="text-center py-8">
               <div className="flex justify-center gap-3 text-3xl">
                 {EMOJI_ROW.map((emoji) => (
@@ -114,6 +165,11 @@ function Home() {
                 Log your first meal
               </Link>
             </div>
+          )}
+          {showNoMatches && (
+            <p className="text-stone-500 text-center py-8">
+              No meals match your search. Try different filters.
+            </p>
           )}
           {entries.map((entry) => (
             <EntryCard key={entry.id} entry={entry} />
