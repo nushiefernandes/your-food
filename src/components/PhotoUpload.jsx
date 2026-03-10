@@ -3,6 +3,8 @@ import { isHeic, extractExifData } from '../lib/imageUtils'
 
 function PhotoUpload({ existingUrls = [], onFilesSelect, onClear }) {
   const [previews, setPreviews] = useState(existingUrls)
+  const [files, setFiles] = useState([])
+  const [exifData, setExifData] = useState([])
   const [isHeicPreview, setIsHeicPreview] = useState(false)
   const [conversionError, setConversionError] = useState(null)
   const inputRef = useRef(null)
@@ -92,6 +94,8 @@ function PhotoUpload({ existingUrls = [], onFilesSelect, onClear }) {
     const allFiles = [primaryFile, ...files.slice(1)]
     const nextPreviews = allFiles.map((file) => URL.createObjectURL(file))
     setPreviews(nextPreviews)
+    setFiles(allFiles)
+    setExifData(exifResults)
     if (onFilesSelect) onFilesSelect(allFiles, exifResults)
   }
 
@@ -101,10 +105,28 @@ function PhotoUpload({ existingUrls = [], onFilesSelect, onClear }) {
       .filter((preview) => preview.startsWith('blob:'))
       .forEach((preview) => URL.revokeObjectURL(preview))
     setPreviews([])
+    setFiles([])
+    setExifData([])
     setIsHeicPreview(false)
     setConversionError(null)
     if (inputRef.current) inputRef.current.value = ''
     if (onClear) onClear()
+  }
+
+  function removePhoto(index) {
+    URL.revokeObjectURL(previews[index])
+    const newPreviews = previews.filter((_, i) => i !== index)
+    const newFiles = files.filter((_, i) => i !== index)
+    const newExifData = exifData.filter((_, i) => i !== index)
+    setPreviews(newPreviews)
+    setFiles(newFiles)
+    setExifData(newExifData)
+    if (newFiles.length === 0) {
+      if (inputRef.current) inputRef.current.value = ''
+      if (onClear) onClear()
+    } else {
+      if (onFilesSelect) onFilesSelect(newFiles, newExifData)
+    }
   }
 
   return (
@@ -118,6 +140,13 @@ function PhotoUpload({ existingUrls = [], onFilesSelect, onClear }) {
         {previews.map((src, i) => (
           <div key={i} className="relative w-16 h-16">
             <img src={src} className="w-full h-full object-cover rounded-lg" alt="" />
+            <button
+              type="button"
+              onClick={() => removePhoto(i)}
+              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center leading-none"
+            >
+              &times;
+            </button>
             {i === 0 && previews.length > 1 && (
               <span className="absolute bottom-0 left-0 bg-black/50 text-white text-[9px] px-1 rounded-br-lg">
                 Primary
@@ -135,15 +164,6 @@ function PhotoUpload({ existingUrls = [], onFilesSelect, onClear }) {
           </button>
         )}
       </div>
-      {previews.length > 0 && (
-        <button
-          type="button"
-          onClick={handleClear}
-          className="text-xs text-stone-500 hover:text-stone-700 transition-colors"
-        >
-          Change / Clear
-        </button>
-      )}
       <input
         ref={inputRef}
         type="file"

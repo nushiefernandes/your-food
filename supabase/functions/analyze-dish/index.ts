@@ -1,12 +1,12 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "@supabase/functions-js/edge-runtime.d.ts"
 
-const IS_DEV = Deno.env.get("ENV") === "development"
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean)
-if (IS_DEV) ALLOWED_ORIGINS.push("*")
+// Default to open when ALLOWED_ORIGIN is not configured — protected by Supabase JWT auth
+if (ALLOWED_ORIGINS.length === 0) ALLOWED_ORIGINS.push("*")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || ""
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || ""
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB
@@ -105,15 +105,6 @@ function allConfidenceZero(parsed: Record<string, unknown>): boolean {
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin") || ""
-
-  // Fail-closed CORS: reject when no origins configured
-  if (ALLOWED_ORIGINS.length === 0) {
-    console.error("ALLOWED_ORIGIN not set — refusing request. Set ENV=development for local dev.")
-    return new Response(JSON.stringify({ suggestions: null, error: "api_error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    })
-  }
 
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders(origin) })
@@ -237,8 +228,8 @@ Deno.serve(async (req) => {
               temperature: 0.2,
               maxOutputTokens: 512,
               responseMimeType: "application/json",
-              thinking_config: { thinking_budget: 0 },
             },
+            thinkingConfig: { thinkingBudget: 0 },
           }),
         },
       )

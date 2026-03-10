@@ -142,7 +142,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotosSelec
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <PhotoUpload
-        existingUrls={initialData?.photo_url ? [initialData.photo_url] : []}
+        existingUrls={[]}
         onFilesSelect={handleFilesSelect}
         onClear={() => {
           setPhotoFiles([])
