@@ -32,9 +32,9 @@ function toDatetimeLocal(date) {
   return d.toISOString().slice(0, 16)
 }
 
-function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelected, onPhotoClear }) {
-  const [photoFile, setPhotoFile] = useState(null)
-  const [exifData, setExifData] = useState(null)
+function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotosSelected, onPhotoClear }) {
+  const [photoFiles, setPhotoFiles] = useState([])
+  const [exifDataArray, setExifDataArray] = useState([])
   const [dishName, setDishName] = useState(initialData?.dish_name || '')
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
@@ -58,6 +58,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   const [aiVisible, setAiVisible] = useState(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const primaryExif = exifDataArray[0] ?? null
   const notesPlaceholder = useMemo(() => {
     const prompts =
       entryType === 'home_cooked' ? HOME_COOKED_PROMPTS : EATING_OUT_PROMPTS
@@ -84,6 +85,15 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
     })
   }
 
+  function handleFilesSelect(files, exifArray) {
+    setPhotoFiles(files)
+    if (exifArray?.[0]?.timestamp && !ateAtTouched) {
+      setAteAt(toDatetimeLocal(exifArray[0].timestamp))
+    }
+    setExifDataArray(exifArray ?? [])
+    if (onPhotosSelected) onPhotosSelected(files, exifArray ?? [])
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!dishName.trim()) return
@@ -105,14 +115,14 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       }
 
       await onSubmit({
-        photoFile,
+        photoFiles,
         dishName: dishName.trim(),
         entryType,
         venueName: entryType === 'eating_out' ? venueName.trim() : '',
         ateAt: new Date(ateAt).toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
-        photoLat: exifData?.lat ?? null,
-        photoLng: exifData?.lng ?? null,
+        photoLat: primaryExif?.lat ?? null,
+        photoLng: primaryExif?.lng ?? null,
         placeId,
         cost: cost ? parseFloat(cost) : null,
         companions: companions.trim(),
@@ -132,22 +142,20 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <PhotoUpload
-        existingUrl={initialData?.photo_url}
-        onFileSelect={(file, exifData) => {
-          setPhotoFile(file)
-          if (exifData?.timestamp && !ateAtTouched) {
-            setAteAt(toDatetimeLocal(exifData.timestamp))
-          }
-          setExifData(exifData)
-          if (onPhotoSelected) onPhotoSelected(file, exifData?.orientation)
-        }}
+        existingUrls={initialData?.photo_url ? [initialData.photo_url] : []}
+        onFilesSelect={handleFilesSelect}
         onClear={() => {
-          setPhotoFile(null)
+          setPhotoFiles([])
+          setExifDataArray([])
           if (onPhotoClear) onPhotoClear()
         }}
       />
-      {(analysis?.status === 'uploading' || analysis?.status === 'analyzing') && (
-        <p className="text-xs text-stone-400 mt-1">Analyzing photo...</p>
+      {analysis?.status === 'analyzing' && (
+        <p className="text-xs text-stone-400 mt-1">
+          {analysis?.uploadResults?.length > 0
+            ? `Analyzing ${analysis.uploadResults.length} photos...`
+            : 'Analyzing photos...'}
+        </p>
       )}
       {analysis?.error === 'resize_failed' && (
         <p className="text-xs text-red-500 mt-1">
@@ -254,7 +262,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
             value={venueName}
             onChange={setVenueName}
             onPlaceSelect={(place) => setPlaceId(place?.id || place?.google_place_id || null)}
-            coords={exifData?.lat ? { lat: exifData.lat, lng: exifData.lng } : null}
+            coords={primaryExif?.lat ? { lat: primaryExif.lat, lng: primaryExif.lng } : null}
           />
         </div>
       )}

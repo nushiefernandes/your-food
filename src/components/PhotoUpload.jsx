@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { isHeic, extractExifData } from '../lib/imageUtils'
 
-function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
-  const [previewUrl, setPreviewUrl] = useState(existingUrl || null)
+function PhotoUpload({ existingUrls = [], onFilesSelect, onClear }) {
+  const [previews, setPreviews] = useState(existingUrls)
   const [isHeicPreview, setIsHeicPreview] = useState(false)
   const [conversionError, setConversionError] = useState(null)
   const inputRef = useRef(null)
@@ -10,33 +10,34 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
 
   useEffect(() => {
     return () => {
-      if (previewUrl && previewUrl !== existingUrl) {
-        URL.revokeObjectURL(previewUrl)
-      }
+      previews
+        .filter((preview) => preview.startsWith('blob:'))
+        .forEach((preview) => URL.revokeObjectURL(preview))
     }
-  }, [previewUrl, existingUrl])
+  }, [previews])
 
   async function handleFileChange(e) {
     const currentId = selectionIdRef.current + 1
     selectionIdRef.current = currentId
 
-    const file = e.target.files[0]
-    if (!file) return
+    const files = Array.from(e.target.files || []).slice(0, 9)
+    if (files.length === 0) return
 
-    const exifData = await extractExifData(file)
+    previews
+      .filter((preview) => preview.startsWith('blob:'))
+      .forEach((preview) => URL.revokeObjectURL(preview))
+
+    const exifResults = await Promise.all(files.map((file) => extractExifData(file)))
     if (selectionIdRef.current !== currentId) return
 
     setConversionError(null)
 
-    if (previewUrl && previewUrl !== existingUrl) {
-      URL.revokeObjectURL(previewUrl)
-    }
+    let primaryFile = files[0]
+    const isHeicFile = isHeic(primaryFile)
 
-    const isHeicFile = isHeic(file)
-
-    if (isHeicFile) {
+    if (isHeicFile && primaryFile) {
       setIsHeicPreview(true)
-      setPreviewUrl(null)
+      setPreviews([])
       let timeoutId
       try {
         const heic2any = (await import('heic2any')).default
@@ -50,7 +51,7 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
 
         const jpegBlob = await Promise.race([
           heic2any({
-            blob: file,
+            blob: primaryFile,
             toType: 'image/jpeg',
             quality: 0.8,
           }),
@@ -62,13 +63,10 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
         const blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob
         const convertedFile = new File(
           [blob],
-          file.name.replace(/\.[^/.]+$/, '.jpg'),
+          primaryFile.name.replace(/\.[^/.]+$/, '.jpg'),
           { type: 'image/jpeg', lastModified: Date.now() }
         )
-        const url = URL.createObjectURL(blob)
-        setPreviewUrl(url)
-        setIsHeicPreview(false)
-        onFileSelect(convertedFile, exifData)
+        primaryFile = convertedFile
       } catch (err) {
         if (typeof timeoutId !== 'undefined') {
           clearTimeout(timeoutId)
@@ -78,71 +76,78 @@ function PhotoUpload({ existingUrl, onFileSelect, onClear }) {
           console.error('[PhotoUpload] HEIC conversion failed:', err)
         }
         setIsHeicPreview(false)
-        setPreviewUrl(null)
+        setPreviews([])
         setConversionError(
           err?.message === 'heic_timeout'
             ? 'Photo conversion took too long. Try a JPEG instead.'
             : 'Could not convert this photo. Try a JPEG instead.'
         )
+        return
       }
-    } else {
-      setIsHeicPreview(false)
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
-      onFileSelect(file, exifData)
     }
+
+    if (selectionIdRef.current !== currentId) return
+    setIsHeicPreview(false)
+
+    const allFiles = [primaryFile, ...files.slice(1)]
+    const nextPreviews = allFiles.map((file) => URL.createObjectURL(file))
+    setPreviews(nextPreviews)
+    if (onFilesSelect) onFilesSelect(allFiles, exifResults)
   }
 
   function handleClear() {
     selectionIdRef.current += 1
-    if (previewUrl && previewUrl !== existingUrl) {
-      URL.revokeObjectURL(previewUrl)
-    }
-    setPreviewUrl(null)
+    previews
+      .filter((preview) => preview.startsWith('blob:'))
+      .forEach((preview) => URL.revokeObjectURL(preview))
+    setPreviews([])
     setIsHeicPreview(false)
     setConversionError(null)
     if (inputRef.current) inputRef.current.value = ''
-    onClear()
-  }
-
-  if (previewUrl || isHeicPreview) {
-    return (
-      <div className="relative mb-4">
-        {isHeicPreview && !previewUrl ? (
-          <div className="w-full h-48 rounded-lg bg-stone-100 flex items-center justify-center text-stone-400 text-sm">
-            Converting photo...
-          </div>
-        ) : (
-          <img
-            src={previewUrl}
-            alt="Meal preview"
-            className="w-full h-48 object-cover rounded-lg"
-          />
-        )}
-        <button
-          type="button"
-          onClick={handleClear}
-          className="absolute top-2 right-2 bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
-        >
-          &times;
-        </button>
-      </div>
-    )
+    if (onClear) onClear()
   }
 
   return (
-    <div className="mb-4">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="w-full h-32 border-2 border-dashed border-stone-300 rounded-lg flex flex-col items-center justify-center text-stone-400 hover:border-stone-400 hover:text-stone-500 transition-colors cursor-pointer"
-      >
-        <span className="text-2xl mb-1">+</span>
-        <span className="text-sm">Add a photo</span>
-      </button>
+    <div className="mb-4 space-y-2">
+      {isHeicPreview && previews.length === 0 && (
+        <div className="w-full h-20 rounded-lg bg-stone-100 flex items-center justify-center text-stone-400 text-sm">
+          Converting photo...
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {previews.map((src, i) => (
+          <div key={i} className="relative w-16 h-16">
+            <img src={src} className="w-full h-full object-cover rounded-lg" alt="" />
+            {i === 0 && previews.length > 1 && (
+              <span className="absolute bottom-0 left-0 bg-black/50 text-white text-[9px] px-1 rounded-br-lg">
+                Primary
+              </span>
+            )}
+          </div>
+        ))}
+        {previews.length < 9 && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="w-16 h-16 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center text-gray-400 text-xl hover:border-gray-400 transition-colors"
+          >
+            {previews.length === 0 ? '📷' : '+'}
+          </button>
+        )}
+      </div>
+      {previews.length > 0 && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="text-xs text-stone-500 hover:text-stone-700 transition-colors"
+        >
+          Change / Clear
+        </button>
+      )}
       <input
         ref={inputRef}
         type="file"
+        multiple
         accept="image/heic,image/heif,image/jpeg,image/png,image/*"
         onChange={handleFileChange}
         className="hidden"

@@ -113,16 +113,22 @@ function Entry() {
     }
     setDeleting(true)
 
-    // Delete photo first — if this fails, keep the entry so user can retry
-    const photoPath = getPhotoPath(entry)
-    if (photoPath) {
-      if (!photoPath.startsWith(user.id + '/')) {
-        setError('Cannot delete: photo path does not match your account')
-        setDeleting(false)
-        setShowDeleteConfirm(false)
-        return
-      }
-      const { error: photoError } = await deletePhoto(photoPath)
+    // Delete photos first — if this fails, keep the entry so user can retry
+    const photoPaths = entry.photos?.length > 0
+      ? entry.photos.map((photo) => photo.path).filter(Boolean)
+      : [getPhotoPath(entry)].filter(Boolean)
+
+    const hasForeignPath = photoPaths.some((path) => !path.startsWith(user.id + '/'))
+    if (hasForeignPath) {
+      setError('Cannot delete: photo path does not match your account')
+      setDeleting(false)
+      setShowDeleteConfirm(false)
+      return
+    }
+
+    if (photoPaths.length > 0) {
+      const deleteResults = await Promise.all(photoPaths.map((path) => deletePhoto(path)))
+      const photoError = deleteResults.find((result) => result?.error)?.error
       if (photoError) {
         setError('Failed to delete photo. Entry kept so you can retry.')
         setDeleting(false)
@@ -169,15 +175,25 @@ function Entry() {
     entryTypeLabel && entry.is_combo
       ? `${entryTypeLabel} · Combo`
       : entryTypeLabel
+  const photos = entry.photos?.length > 0
+    ? entry.photos
+    : entry.photo_url
+      ? [{ url: entry.photo_url, id: 'legacy' }]
+      : []
 
   return (
     <PageShell backTo="/">
-      {entry.photo_url ? (
-        <img
-          src={entry.photo_url}
-          alt={entry.dish_name}
-          className="w-full h-64 object-cover rounded-lg mb-4"
-        />
+      {photos.length > 0 ? (
+        <div className={`grid gap-2 ${photos.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} mb-4`}>
+          {photos.map((photo, i) => (
+            <img
+              key={photo.id ?? i}
+              src={photo.url}
+              alt={`Photo ${i + 1}`}
+              className={`w-full object-cover rounded-lg ${photos.length === 1 ? 'max-h-64' : 'h-40'}`}
+            />
+          ))}
+        </div>
       ) : (
         <div className="w-full h-40 bg-stone-100 rounded-lg flex items-center justify-center mb-4">
           <span className="text-stone-300 text-5xl">&#127858;</span>
