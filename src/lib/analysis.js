@@ -10,6 +10,10 @@ function delay(ms) {
 }
 
 export async function analyzeDishPhoto(photoPath) {
+  return analyzeDishPhotos([photoPath])
+}
+
+export async function analyzeDishPhotos(photoPaths) {
   if (MOCK_AI) {
     await delay(800)
     return {
@@ -38,7 +42,7 @@ export async function analyzeDishPhoto(photoPath) {
 
   try {
     const invokePromise = supabase.functions.invoke('analyze-dish', {
-      body: { photoPath },
+      body: { photoPaths },
       signal: controller.signal
     }).then(({ data, error }) => {
       if (error || data?.error) {

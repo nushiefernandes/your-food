@@ -104,6 +104,13 @@ const { state, mockSupabase } = vi.hoisted(() => {
         return makeEntriesQueryBuilder()
       }
 
+      if (table === 'entry_photos') {
+        // Return a no-op builder for entry_photos — E2E test focuses on entries flow
+        const noop = { data: [], error: null }
+        const builder = { select: () => builder, eq: () => builder, order: () => Promise.resolve(noop), insert: () => Promise.resolve(noop), delete: () => builder, in: () => Promise.resolve(noop) }
+        return builder
+      }
+
       throw new Error(`Unexpected table access in E2E flow: ${table}`)
     }),
   }

@@ -28,11 +28,13 @@ function makeEntriesBuilder() {
     select: vi.fn(),
     order: vi.fn(),
     eq: vi.fn(),
+    in: vi.fn(),
     or: vi.fn(),
     gte: vi.fn(),
     lte: vi.fn(),
     ilike: vi.fn(),
     not: vi.fn(),
+    limit: vi.fn(),
     single: vi.fn(),
     insert: vi.fn(),
     update: vi.fn(),
@@ -41,11 +43,13 @@ function makeEntriesBuilder() {
 
   builder.select.mockImplementation(() => builder)
   builder.eq.mockImplementation(() => builder)
+  builder.in.mockImplementation(() => builder)
   builder.or.mockImplementation(() => builder)
   builder.gte.mockImplementation(() => builder)
   builder.lte.mockImplementation(() => builder)
   builder.ilike.mockImplementation(() => builder)
   builder.not.mockImplementation(() => builder)
+  builder.limit.mockImplementation(() => builder)
   builder.insert.mockImplementation(() => builder)
   builder.update.mockImplementation(() => builder)
   builder.delete.mockImplementation(() => builder)
@@ -74,19 +78,52 @@ describe('entries lib', () => {
   })
 
   it('getEntry fetches one row by id', async () => {
-    const builder = makeEntriesBuilder()
+    const entriesBuilder = makeEntriesBuilder()
+    const photosBuilder = makeEntriesBuilder()
     const row = { id: 'entry-42', dish_name: 'Ramen' }
 
-    builder.single.mockResolvedValue({ data: row, error: null })
-    mockSupabase.from.mockReturnValue(builder)
+    entriesBuilder.single.mockResolvedValue({ data: row, error: null })
+    photosBuilder.order.mockResolvedValue({ data: [], error: null })
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'entries') return entriesBuilder
+      if (table === 'entry_photos') return photosBuilder
+      return makeEntriesBuilder()
+    })
 
     const result = await getEntry('entry-42')
 
-    expect(mockSupabase.from).toHaveBeenCalledWith('entries')
-    expect(builder.select).toHaveBeenCalledWith('*')
-    expect(builder.eq).toHaveBeenCalledWith('id', 'entry-42')
-    expect(builder.single).toHaveBeenCalledTimes(1)
-    expect(result).toEqual({ data: row, error: null })
+    expect(entriesBuilder.select).toHaveBeenCalledWith('*')
+    expect(entriesBuilder.eq).toHaveBeenCalledWith('id', 'entry-42')
+    expect(entriesBuilder.single).toHaveBeenCalledTimes(1)
+    expect(photosBuilder.select).toHaveBeenCalledWith('*')
+    expect(photosBuilder.eq).toHaveBeenCalledWith('entry_id', 'entry-42')
+    expect(photosBuilder.order).toHaveBeenCalledWith('sort_order')
+    expect(result).toEqual({ data: { ...row, photos: [] }, error: null })
+  })
+
+  it('getEntry returns entry with photos from entry_photos table', async () => {
+    const entriesBuilder = makeEntriesBuilder()
+    const photosBuilder = makeEntriesBuilder()
+    const row = { id: 'entry-42', dish_name: 'Ramen' }
+    const photos = [
+      { id: 'photo-1', entry_id: 'entry-42', sort_order: 0 },
+      { id: 'photo-2', entry_id: 'entry-42', sort_order: 1 },
+    ]
+
+    entriesBuilder.single.mockResolvedValue({ data: row, error: null })
+    photosBuilder.order.mockResolvedValue({ data: photos, error: null })
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'entries') return entriesBuilder
+      if (table === 'entry_photos') return photosBuilder
+      return makeEntriesBuilder()
+    })
+
+    const result = await getEntry('entry-42')
+
+    expect(result).toEqual({
+      data: { ...row, photos },
+      error: null,
+    })
   })
 
   it('createEntry adds authenticated user_id before insert', async () => {
@@ -108,6 +145,99 @@ describe('entries lib', () => {
     expect(result.data.user_id).toBe('user-123')
   })
 
+  it('createEntry with one photo inserts entry_photos with is_primary true', async () => {
+    const entriesBuilder = makeEntriesBuilder()
+    const photosBuilder = makeEntriesBuilder()
+
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    entriesBuilder.single.mockResolvedValue({
+      data: { id: 'entry-1', dish_name: 'Pho', user_id: 'user-123' },
+      error: null,
+    })
+    photosBuilder.insert.mockResolvedValue({ error: null })
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'entries') return entriesBuilder
+      if (table === 'entry_photos') return photosBuilder
+      return makeEntriesBuilder()
+    })
+
+    await createEntry(
+      { dish_name: 'Pho' },
+      [{
+        url: 'https://cdn.example/p1.jpg',
+        path: 'user-123/p1.jpg',
+        gps_lat: 12.9,
+        gps_lng: 77.5,
+        taken_at: '2026-03-10T10:00:00Z',
+      }]
+    )
+
+    expect(photosBuilder.insert).toHaveBeenCalledWith([{
+      entry_id: 'entry-1',
+      url: 'https://cdn.example/p1.jpg',
+      path: 'user-123/p1.jpg',
+      gps_lat: 12.9,
+      gps_lng: 77.5,
+      taken_at: '2026-03-10T10:00:00Z',
+      is_primary: true,
+      sort_order: 0,
+    }])
+  })
+
+  it('createEntry with multiple photos sets is_primary false for index 1', async () => {
+    const entriesBuilder = makeEntriesBuilder()
+    const photosBuilder = makeEntriesBuilder()
+
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    entriesBuilder.single.mockResolvedValue({
+      data: { id: 'entry-1', dish_name: 'Pho', user_id: 'user-123' },
+      error: null,
+    })
+    photosBuilder.insert.mockResolvedValue({ error: null })
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'entries') return entriesBuilder
+      if (table === 'entry_photos') return photosBuilder
+      return makeEntriesBuilder()
+    })
+
+    await createEntry(
+      { dish_name: 'Pho' },
+      [
+        { url: 'https://cdn.example/p1.jpg', path: 'user-123/p1.jpg' },
+        { url: 'https://cdn.example/p2.jpg', path: 'user-123/p2.jpg' },
+      ]
+    )
+
+    const insertedRows = photosBuilder.insert.mock.calls[0][0]
+    expect(insertedRows[1]).toMatchObject({
+      entry_id: 'entry-1',
+      url: 'https://cdn.example/p2.jpg',
+      path: 'user-123/p2.jpg',
+      is_primary: false,
+      sort_order: 1,
+    })
+  })
+
+  it('createEntry without photos does not insert into entry_photos', async () => {
+    const entriesBuilder = makeEntriesBuilder()
+    const photosBuilder = makeEntriesBuilder()
+
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    entriesBuilder.single.mockResolvedValue({
+      data: { id: 'entry-1', dish_name: 'Pho', user_id: 'user-123' },
+      error: null,
+    })
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'entries') return entriesBuilder
+      if (table === 'entry_photos') return photosBuilder
+      return makeEntriesBuilder()
+    })
+
+    await createEntry({ dish_name: 'Pho' })
+
+    expect(photosBuilder.insert).not.toHaveBeenCalled()
+  })
+
   it('updateEntry updates one row by id and returns single row', async () => {
     const builder = makeEntriesBuilder()
 
@@ -123,6 +253,53 @@ describe('entries lib', () => {
     expect(builder.eq).toHaveBeenCalledWith('id', 'entry-1')
     expect(builder.select).toHaveBeenCalledTimes(1)
     expect(builder.single).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ data: { id: 'entry-1', notes: 'Updated' }, error: null })
+  })
+
+  it('updateEntry deletes removed photo IDs and inserts added photos', async () => {
+    const updateBuilder = makeEntriesBuilder()
+    const deletePhotosBuilder = makeEntriesBuilder()
+    const maxSortBuilder = makeEntriesBuilder()
+    const insertPhotosBuilder = makeEntriesBuilder()
+
+    updateBuilder.single.mockResolvedValue({
+      data: { id: 'entry-1', notes: 'Updated' },
+      error: null,
+    })
+    deletePhotosBuilder.in.mockResolvedValue({ error: null })
+    maxSortBuilder.order.mockImplementation(() => maxSortBuilder)
+    maxSortBuilder.limit.mockResolvedValue({ data: [{ sort_order: 2 }], error: null })
+    insertPhotosBuilder.insert.mockResolvedValue({ error: null })
+
+    mockSupabase.from
+      .mockReturnValueOnce(updateBuilder)
+      .mockReturnValueOnce(deletePhotosBuilder)
+      .mockReturnValueOnce(maxSortBuilder)
+      .mockReturnValueOnce(insertPhotosBuilder)
+
+    const result = await updateEntry(
+      'entry-1',
+      { notes: 'Updated' },
+      [{ url: 'https://cdn.example/p3.jpg', path: 'user-1/p3.jpg' }],
+      ['remove-id-1']
+    )
+
+    expect(deletePhotosBuilder.delete).toHaveBeenCalledTimes(1)
+    expect(deletePhotosBuilder.in).toHaveBeenCalledWith('id', ['remove-id-1'])
+    expect(maxSortBuilder.select).toHaveBeenCalledWith('sort_order')
+    expect(maxSortBuilder.eq).toHaveBeenCalledWith('entry_id', 'entry-1')
+    expect(maxSortBuilder.order).toHaveBeenCalledWith('sort_order', { ascending: false })
+    expect(maxSortBuilder.limit).toHaveBeenCalledWith(1)
+    expect(insertPhotosBuilder.insert).toHaveBeenCalledWith([{
+      entry_id: 'entry-1',
+      url: 'https://cdn.example/p3.jpg',
+      path: 'user-1/p3.jpg',
+      gps_lat: null,
+      gps_lng: null,
+      taken_at: null,
+      is_primary: false,
+      sort_order: 3,
+    }])
     expect(result).toEqual({ data: { id: 'entry-1', notes: 'Updated' }, error: null })
   })
 

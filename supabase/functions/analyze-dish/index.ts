@@ -30,6 +30,24 @@ RULES:
 - Return ONLY the JSON object, no other text
 `
 
+const PROMPT_MULTI = `You are a food identification expert specializing in Indian cuisine and international dishes commonly eaten in India.
+
+You are shown multiple photos of the same meal. Identify ALL dishes visible across ALL photos and return a single JSON object:
+
+{
+  "dish_name": { "value": "<all dishes comma-separated>", "confidence": <0.0-1.0> },
+  "cuisine_type": { "value": "<cuisine category>", "confidence": <0.0-1.0> },
+  "entry_type": { "value": "eating_out" | "home_cooked", "confidence": <0.0-1.0> }
+}
+
+RULES:
+- Use the local/native name (e.g. "Paneer Butter Masala", "Idli", "Biryani")
+- List ALL identifiable dishes from all photos, comma-separated
+- entry_type must be exactly "eating_out" or "home_cooked" — judge from plating, background, and presentation across all photos
+- If none of the images are food, set all confidence values to 0
+- Return ONLY the JSON object, no other text
+`
+
 function corsHeaders(origin: string) {
   const allowedOrigin = ALLOWED_ORIGINS.includes("*")
     ? "*"
@@ -120,44 +138,82 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const photoPath = body?.photoPath
+    const photoPaths = Array.isArray(body?.photoPaths)
+      ? body.photoPaths
+      : typeof body?.photoPath === "string"
+        ? [body.photoPath]
+        : []
 
-    if (typeof photoPath !== "string" || !isValidPhotoPath(photoPath)) {
+    if (
+      photoPaths.length === 0 || photoPaths.length > 9 ||
+      photoPaths.some((photoPath) => typeof photoPath !== "string")
+    ) {
+      return jsonResponse({ suggestions: null, error: "invalid_path" }, origin)
+    }
+
+    if (photoPaths.some((photoPath) => !isValidPhotoPath(photoPath))) {
       return jsonResponse({ suggestions: null, error: "invalid_path" }, origin)
     }
 
     // Ownership check: photoPath must start with the authenticated user's ID
-    if (userId && !photoPath.startsWith(userId + "/")) {
-      console.error("Ownership check failed:", photoPath, "for user", userId)
+    if (userId && photoPaths.some((photoPath) => !photoPath.startsWith(userId + "/"))) {
+      const invalidPath = photoPaths.find((photoPath) => !photoPath.startsWith(userId + "/"))
+      console.error("Ownership check failed:", invalidPath, "for user", userId)
       return jsonResponse({ suggestions: null, error: "invalid_path" }, origin)
     }
 
-    const storageUrl =
-      `${SUPABASE_URL}/storage/v1/object/public/meal-photos/${photoPath}`
+    let images: Array<{ mimeType: string; data: string }>
+    try {
+      images = await Promise.all(
+        photoPaths.map(async (photoPath) => {
+          const storageUrl =
+            `${SUPABASE_URL}/storage/v1/object/public/meal-photos/${photoPath}`
 
-    const imageResponse = await fetch(storageUrl)
-    if (!imageResponse.ok) {
-      console.error("Storage fetch failed", imageResponse.status)
+          const imageResponse = await fetch(storageUrl)
+          if (!imageResponse.ok) {
+            console.error("Storage fetch failed", imageResponse.status)
+            throw new Error("api_error")
+          }
+
+          // Size limit: reject images larger than 5MB (defense-in-depth; client resizes to ~200KB)
+          const contentLength = parseInt(imageResponse.headers.get("content-length") || "0", 10)
+          if (contentLength > MAX_IMAGE_BYTES) {
+            console.error("Image too large:", contentLength, "bytes")
+            throw new Error("payload_too_large")
+          }
+
+          const contentType = imageResponse.headers.get("content-type") ||
+            "image/jpeg"
+          const arrayBuffer = await imageResponse.arrayBuffer()
+
+          // Double-check actual size (content-length can be missing or wrong)
+          if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+            console.error("Image body too large:", arrayBuffer.byteLength, "bytes")
+            throw new Error("payload_too_large")
+          }
+
+          return {
+            mimeType: contentType,
+            data: arrayBufferToBase64(arrayBuffer),
+          }
+        }),
+      )
+    } catch (error) {
+      if (error instanceof Error && error.message === "payload_too_large") {
+        return jsonResponse({ suggestions: null, error: "payload_too_large" }, origin)
+      }
       return jsonResponse({ suggestions: null, error: "api_error" }, origin)
     }
 
-    // Size limit: reject images larger than 5MB (defense-in-depth; client resizes to ~200KB)
-    const contentLength = parseInt(imageResponse.headers.get("content-length") || "0", 10)
-    if (contentLength > MAX_IMAGE_BYTES) {
-      console.error("Image too large:", contentLength, "bytes")
-      return jsonResponse({ suggestions: null, error: "payload_too_large" }, origin)
-    }
-
-    const contentType = imageResponse.headers.get("content-type") ||
-      "image/jpeg"
-    const arrayBuffer = await imageResponse.arrayBuffer()
-
-    // Double-check actual size (content-length can be missing or wrong)
-    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
-      console.error("Image body too large:", arrayBuffer.byteLength, "bytes")
-      return jsonResponse({ suggestions: null, error: "payload_too_large" }, origin)
-    }
-    const base64 = arrayBufferToBase64(arrayBuffer)
+    const parts = [
+      { text: photoPaths.length > 1 ? PROMPT_MULTI : PROMPT },
+      ...images.map((image) => ({
+        inlineData: {
+          mimeType: image.mimeType,
+          data: image.data,
+        },
+      })),
+    ]
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 25000)
@@ -174,15 +230,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             contents: [
               {
-                parts: [
-                  { text: PROMPT },
-                  {
-                    inlineData: {
-                      mimeType: contentType,
-                      data: base64,
-                    },
-                  },
-                ],
+                parts,
               },
             ],
             generationConfig: {
