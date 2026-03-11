@@ -16,5 +16,6 @@ export default defineConfig({
     clearMocks: true,
     restoreMocks: true,
     mockReset: true,
+    setupFiles: ['./src/test-setup.js'],
   },
 })
