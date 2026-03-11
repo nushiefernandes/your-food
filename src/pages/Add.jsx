@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createEntry, updateEntry } from '../lib/entries'
-import { uploadPhoto } from '../lib/storage'
 import { fetchWeather } from '../lib/weather'
 import { useMultiPhotoAnalysis } from '../hooks/useMultiPhotoAnalysis'
 import PageShell from '../components/PageShell'
@@ -45,20 +43,10 @@ async function fetchWeatherAndNeighbourhood(entryId, lat, lng, ateAt) {
 
 function Add() {
   const navigate = useNavigate()
-  const [primaryExif, setPrimaryExif] = useState(null)
-  const { analysis, analyzePhotos, clearAnalysis, claimUploads } = useMultiPhotoAnalysis()
-
-  function handlePhotosSelected(files, exifArray) {
-    setPrimaryExif(exifArray?.[0] ?? null)
-    analyzePhotos(files, exifArray)
-  }
-
-  function handlePhotoClear() {
-    setPrimaryExif(null)
-    clearAnalysis()
-  }
+  const { photos, processing, processingError, analysis, addFiles, removePhoto, clearAll, claimUploads } = useMultiPhotoAnalysis()
 
   async function handleSubmit(formData) {
+    const primaryExif = photos[0]?.exif ?? null
     const primaryLat = primaryExif?.gps_lat ?? primaryExif?.lat ?? null
     const primaryLng = primaryExif?.gps_lng ?? primaryExif?.lng ?? null
     const primaryTakenAt = primaryExif?.timestamp ?? null
@@ -72,16 +60,6 @@ function Add() {
         gps_lng: i === 0 ? primaryLng : null,
         taken_at: i === 0 ? primaryTakenAt : null,
       }))
-    } else if (formData.photoFiles?.length > 0) {
-      const { url, path, error: uploadError } = await uploadPhoto(formData.photoFiles[0])
-      if (uploadError) throw uploadError
-      allPhotos = [{
-        url,
-        path,
-        gps_lat: primaryLat,
-        gps_lng: primaryLng,
-        taken_at: primaryTakenAt,
-      }]
     }
 
     const entryData = {
@@ -108,9 +86,8 @@ function Add() {
 
     const { data: entry, error } = await createEntry(entryData, allPhotos)
 
-    if (!error) claimUploads()
-
     if (error) throw error
+    claimUploads()
 
     // Fire-and-forget: weather + neighbourhood (never blocks navigation)
     if (entry?.id && primaryLat && primaryLng) {
@@ -126,8 +103,12 @@ function Add() {
         onSubmit={handleSubmit}
         submitLabel="Save entry"
         analysis={analysis}
-        onPhotosSelected={handlePhotosSelected}
-        onPhotoClear={handlePhotoClear}
+        photos={photos}
+        processing={processing}
+        processingError={processingError}
+        onFilesAdded={addFiles}
+        onPhotoRemoved={removePhoto}
+        onPhotoClear={clearAll}
       />
     </PageShell>
   )

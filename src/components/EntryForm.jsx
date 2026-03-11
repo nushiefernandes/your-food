@@ -32,9 +32,18 @@ function toDatetimeLocal(date) {
   return d.toISOString().slice(0, 16)
 }
 
-function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotosSelected, onPhotoClear }) {
-  const [photoFiles, setPhotoFiles] = useState([])
-  const [exifDataArray, setExifDataArray] = useState([])
+function EntryForm({
+  initialData,
+  onSubmit,
+  submitLabel,
+  analysis,
+  photos,
+  processing,
+  processingError,
+  onFilesAdded,
+  onPhotoRemoved,
+  onPhotoClear,
+}) {
   const [dishName, setDishName] = useState(initialData?.dish_name || '')
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
@@ -58,7 +67,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotosSelec
   const [aiVisible, setAiVisible] = useState(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
-  const primaryExif = exifDataArray[0] ?? null
+  const primaryExif = photos?.[0]?.exif ?? null
   const notesPlaceholder = useMemo(() => {
     const prompts =
       entryType === 'home_cooked' ? HOME_COOKED_PROMPTS : EATING_OUT_PROMPTS
@@ -85,15 +94,6 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotosSelec
     })
   }
 
-  function handleFilesSelect(files, exifArray) {
-    setPhotoFiles(files)
-    if (exifArray?.[0]?.timestamp && !ateAtTouched) {
-      setAteAt(toDatetimeLocal(exifArray[0].timestamp))
-    }
-    setExifDataArray(exifArray ?? [])
-    if (onPhotosSelected) onPhotosSelected(files, exifArray ?? [])
-  }
-
   async function handleSubmit(e) {
     e.preventDefault()
     if (!dishName.trim()) return
@@ -115,7 +115,6 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotosSelec
       }
 
       await onSubmit({
-        photoFiles,
         dishName: dishName.trim(),
         entryType,
         venueName: entryType === 'eating_out' ? venueName.trim() : '',
@@ -142,13 +141,11 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotosSelec
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <PhotoUpload
-        existingUrls={[]}
-        onFilesSelect={handleFilesSelect}
-        onClear={() => {
-          setPhotoFiles([])
-          setExifDataArray([])
-          if (onPhotoClear) onPhotoClear()
-        }}
+        photos={photos ?? []}
+        onFilesAdded={onFilesAdded}
+        onPhotoRemoved={onPhotoRemoved}
+        isProcessing={processing}
+        processingError={processingError}
       />
       {analysis?.status === 'analyzing' && (
         <p className="text-xs text-stone-400 mt-1">

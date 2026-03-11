@@ -140,3 +140,44 @@ export async function resizeForAnalysis(file, orientation) {
     image.src = objectUrl
   })
 }
+
+export async function processFiles(rawFiles, existingCount = 0) {
+  const batch = Array.from(rawFiles).slice(0, 9 - existingCount)
+  if (batch.length === 0) return []
+
+  return Promise.all(batch.map(async (file) => {
+    const exif = await extractExifData(file)
+
+    let processedFile = file
+    if (isHeic(file)) {
+      let timeoutId
+      try {
+        const heic2any = (await import('heic2any')).default
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('heic_timeout')), 15000)
+        })
+        const jpegBlob = await Promise.race([
+          heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 }),
+          timeoutPromise,
+        ])
+        clearTimeout(timeoutId)
+        const blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob
+        processedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+          type: 'image/jpeg',
+          lastModified: Date.now(),
+        })
+      } catch (err) {
+        if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId)
+        const type = err?.message === 'heic_timeout' ? 'heic_timeout' : 'heic_error'
+        throw { type, fileName: file.name }
+      }
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      rawFile: processedFile,
+      previewUrl: URL.createObjectURL(processedFile),
+      exif,
+    }
+  }))
+}
