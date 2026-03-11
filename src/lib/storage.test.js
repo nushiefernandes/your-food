@@ -20,7 +20,7 @@ vi.mock('./supabase', () => ({
   supabase: mockSupabase,
 }))
 
-import { deletePhoto, uploadPhoto } from './storage'
+import { deletePhoto, uploadPhoto, uploadPhotos } from './storage'
 
 describe('storage lib', () => {
   beforeEach(() => {
@@ -74,6 +74,35 @@ describe('storage lib', () => {
 
     expect(result).toEqual({ url: null, path: null, error: uploadError })
     expect(mockBucket.getPublicUrl).not.toHaveBeenCalled()
+  })
+
+  it('uploadPhotos uploads all files and returns all results', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockBucket.upload.mockResolvedValue({ error: null })
+    mockBucket.getPublicUrl.mockImplementation((path) => ({
+      data: { publicUrl: `https://cdn.example/${path}` },
+    }))
+
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.5)
+      .mockReturnValueOnce(0.7)
+
+    const file1 = new File(['img-1'], 'meal-1.jpg', { type: 'image/jpeg' })
+    const file2 = new File(['img-2'], 'meal-2.jpg', { type: 'image/jpeg' })
+
+    const result = await uploadPhotos([file1, file2])
+    const [path1] = mockBucket.upload.mock.calls[0]
+    const [path2] = mockBucket.upload.mock.calls[1]
+
+    expect(mockSupabase.auth.getUser).toHaveBeenCalledTimes(2)
+    expect(mockBucket.upload).toHaveBeenCalledTimes(2)
+    expect(mockBucket.upload).toHaveBeenNthCalledWith(1, path1, file1)
+    expect(mockBucket.upload).toHaveBeenNthCalledWith(2, path2, file2)
+    expect(result).toEqual([
+      { url: `https://cdn.example/${path1}`, path: path1, error: null },
+      { url: `https://cdn.example/${path2}`, path: path2, error: null },
+    ])
   })
 
   it('deletePhoto removes path from storage bucket', async () => {

@@ -1,8 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { createEntry, updateEntry } from '../lib/entries'
-import { uploadPhoto } from '../lib/storage'
 import { fetchWeather } from '../lib/weather'
-import { usePhotoAnalysis } from '../hooks/usePhotoAnalysis'
+import { useMultiPhotoAnalysis } from '../hooks/useMultiPhotoAnalysis'
 import PageShell from '../components/PageShell'
 import EntryForm from '../components/EntryForm'
 
@@ -44,32 +43,26 @@ async function fetchWeatherAndNeighbourhood(entryId, lat, lng, ateAt) {
 
 function Add() {
   const navigate = useNavigate()
-  const { analysis, analyzePhoto, clearAnalysis, claimUpload } = usePhotoAnalysis()
-
-  function handlePhotoSelected(file, orientation) {
-    analyzePhoto(file, orientation)
-  }
-
-  function handlePhotoClear() {
-    clearAnalysis()
-  }
+  const { photos, processing, processingError, analysis, addFiles, removePhoto, clearAll, claimUploads } = useMultiPhotoAnalysis()
 
   async function handleSubmit(formData) {
-    let photoUrl = null
-    let photoPath = null
+    const primaryExif = photos[0]?.exif ?? null
+    const primaryLat = primaryExif?.gps_lat ?? primaryExif?.lat ?? null
+    const primaryLng = primaryExif?.gps_lng ?? primaryExif?.lng ?? null
+    const primaryTakenAt = primaryExif?.timestamp ?? null
+    let allPhotos = []
 
-    if (analysis?.uploadResult) {
-      photoUrl = analysis.uploadResult.url
-      photoPath = analysis.uploadResult.path
-      claimUpload()
-    } else if (formData.photoFile) {
-      const { url, path, error: uploadError } = await uploadPhoto(formData.photoFile)
-      if (uploadError) throw uploadError
-      photoUrl = url
-      photoPath = path
+    if (analysis?.uploadResults?.length > 0) {
+      allPhotos = analysis.uploadResults.map((result, i) => ({
+        url: result.url,
+        path: result.path,
+        gps_lat: i === 0 ? primaryLat : null,
+        gps_lng: i === 0 ? primaryLng : null,
+        taken_at: i === 0 ? primaryTakenAt : null,
+      }))
     }
 
-    const { data: entry, error } = await createEntry({
+    const entryData = {
       dish_name: formData.dishName,
       venue_name: formData.venueName || null,
       entry_type: formData.entryType,
@@ -83,19 +76,22 @@ function Add() {
       recipe_url: formData.recipeUrl,
       prep_time_minutes: formData.prepTime,
       cuisine_type: formData.cuisineType || null,
-      photo_url: photoUrl,
-      photo_path: photoPath,
-      photo_lat: formData.photoLat,
-      photo_lng: formData.photoLng,
+      photo_url: allPhotos[0]?.url ?? null,
+      photo_path: allPhotos[0]?.path ?? null,
+      photo_lat: primaryLat,
+      photo_lng: primaryLng,
       place_id: formData.placeId || null,
       ai_suggestions: analysis?.suggestions || null,
-    })
+    }
+
+    const { data: entry, error } = await createEntry(entryData, allPhotos)
 
     if (error) throw error
+    claimUploads()
 
     // Fire-and-forget: weather + neighbourhood (never blocks navigation)
-    if (entry?.id && formData.photoLat && formData.photoLng) {
-      fetchWeatherAndNeighbourhood(entry.id, formData.photoLat, formData.photoLng, formData.ateAt)
+    if (entry?.id && primaryLat && primaryLng) {
+      fetchWeatherAndNeighbourhood(entry.id, primaryLat, primaryLng, formData.ateAt)
     }
 
     navigate('/?saved=1')
@@ -107,8 +103,12 @@ function Add() {
         onSubmit={handleSubmit}
         submitLabel="Save entry"
         analysis={analysis}
-        onPhotoSelected={handlePhotoSelected}
-        onPhotoClear={handlePhotoClear}
+        photos={photos}
+        processing={processing}
+        processingError={processingError}
+        onFilesAdded={addFiles}
+        onPhotoRemoved={removePhoto}
+        onPhotoClear={clearAll}
       />
     </PageShell>
   )

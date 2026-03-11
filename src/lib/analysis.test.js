@@ -12,7 +12,7 @@ vi.mock('./supabase', () => ({
   supabase: mockSupabase,
 }))
 
-import { analyzeDishPhoto, filterByConfidence } from './analysis'
+import { analyzeDishPhoto, analyzeDishPhotos, filterByConfidence } from './analysis'
 
 describe('analysis lib', () => {
   beforeEach(() => {
@@ -42,8 +42,8 @@ describe('analysis lib', () => {
     })
   })
 
-  describe('analyzeDishPhoto', () => {
-    it('invokes analyze-dish Edge Function with photoPath', async () => {
+  describe('analyzeDishPhotos', () => {
+    it('invokes analyze-dish Edge Function with single photoPaths array', async () => {
       mockSupabase.functions.invoke.mockResolvedValue({
         data: {
           suggestions: { dish_name: { value: 'Dosa', confidence: 0.9 } },
@@ -53,11 +53,54 @@ describe('analysis lib', () => {
         error: null,
       })
 
-      const result = await analyzeDishPhoto('user-1/meal.jpg')
+      const result = await analyzeDishPhotos(['p1'])
 
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith(
         'analyze-dish',
-        expect.objectContaining({ body: { photoPath: 'user-1/meal.jpg' } })
+        expect.objectContaining({ body: { photoPaths: ['p1'] } })
+      )
+      expect(result).toEqual({
+        suggestions: { dish_name: { value: 'Dosa', confidence: 0.9 } },
+        model: 'gemini-2.5-flash',
+        latency_ms: 812,
+      })
+    })
+
+    it('invokes analyze-dish Edge Function with all provided photo paths', async () => {
+      mockSupabase.functions.invoke.mockResolvedValue({
+        data: {
+          suggestions: { dish_name: { value: 'Thali', confidence: 0.88 } },
+          model: 'gemini-2.5-flash',
+          latency_ms: 640,
+        },
+        error: null,
+      })
+
+      await analyzeDishPhotos(['p1', 'p2', 'p3'])
+
+      expect(mockSupabase.functions.invoke).toHaveBeenCalledWith(
+        'analyze-dish',
+        expect.objectContaining({ body: { photoPaths: ['p1', 'p2', 'p3'] } })
+      )
+    })
+  })
+
+  describe('analyzeDishPhoto', () => {
+    it('delegates to analyzeDishPhotos with a single path array', async () => {
+      mockSupabase.functions.invoke.mockResolvedValue({
+        data: {
+          suggestions: { dish_name: { value: 'Dosa', confidence: 0.9 } },
+          model: 'gemini-2.5-flash',
+          latency_ms: 812,
+        },
+        error: null,
+      })
+
+      const result = await analyzeDishPhoto('p1')
+
+      expect(mockSupabase.functions.invoke).toHaveBeenCalledWith(
+        'analyze-dish',
+        expect.objectContaining({ body: { photoPaths: ['p1'] } })
       )
       expect(result).toEqual({
         suggestions: { dish_name: { value: 'Dosa', confidence: 0.9 } },

@@ -22,6 +22,10 @@ export async function uploadPhoto(file) {
   return { url: data.publicUrl, path, error: null }
 }
 
+export async function uploadPhotos(files) {
+  return Promise.all(files.map((f) => uploadPhoto(f)))
+}
+
 export async function deletePhoto(path) {
   const { error } = await supabase.storage
     .from('meal-photos')

@@ -32,9 +32,18 @@ function toDatetimeLocal(date) {
   return d.toISOString().slice(0, 16)
 }
 
-function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelected, onPhotoClear }) {
-  const [photoFile, setPhotoFile] = useState(null)
-  const [exifData, setExifData] = useState(null)
+function EntryForm({
+  initialData,
+  onSubmit,
+  submitLabel,
+  analysis,
+  photos,
+  processing,
+  processingError,
+  onFilesAdded,
+  onPhotoRemoved,
+  onPhotoClear,
+}) {
   const [dishName, setDishName] = useState(initialData?.dish_name || '')
   const [entryType, setEntryType] = useState(initialData?.entry_type || 'eating_out')
   const [isCombo, setIsCombo] = useState(initialData?.is_combo || false)
@@ -56,8 +65,11 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   const [notes, setNotes] = useState(initialData?.notes || '')
   const userTouchedEntryType = useRef(!!initialData?.entry_type)
   const [aiVisible, setAiVisible] = useState(new Set())
+  const aiVisibleRef = useRef(new Set())
+  useEffect(() => { aiVisibleRef.current = aiVisible }, [aiVisible])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const primaryExif = photos?.[0]?.exif ?? null
   const notesPlaceholder = useMemo(() => {
     const prompts =
       entryType === 'home_cooked' ? HOME_COOKED_PROMPTS : EATING_OUT_PROMPTS
@@ -67,8 +79,8 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   useEffect(() => {
     if (analysis?.status !== 'done' || !analysis?.suggestions) return
     const s = analysis.suggestions
-    if (s.dish_name && !dishName) setDishName(s.dish_name)
-    if (s.cuisine_type && !cuisineType) setCuisineType(s.cuisine_type)
+    if (s.dish_name && (!dishName || aiVisibleRef.current.has('dish_name'))) setDishName(s.dish_name)
+    if (s.cuisine_type && (!cuisineType || aiVisibleRef.current.has('cuisine_type'))) setCuisineType(s.cuisine_type)
     if (s.entry_type && !userTouchedEntryType.current && (s.entry_type === 'eating_out' || s.entry_type === 'home_cooked')) {
       setEntryType(s.entry_type)
     }
@@ -105,14 +117,13 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
       }
 
       await onSubmit({
-        photoFile,
         dishName: dishName.trim(),
         entryType,
         venueName: entryType === 'eating_out' ? venueName.trim() : '',
         ateAt: new Date(ateAt).toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
-        photoLat: exifData?.lat ?? null,
-        photoLng: exifData?.lng ?? null,
+        photoLat: primaryExif?.lat ?? null,
+        photoLng: primaryExif?.lng ?? null,
         placeId,
         cost: cost ? parseFloat(cost) : null,
         companions: companions.trim(),
@@ -132,22 +143,18 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <PhotoUpload
-        existingUrl={initialData?.photo_url}
-        onFileSelect={(file, exifData) => {
-          setPhotoFile(file)
-          if (exifData?.timestamp && !ateAtTouched) {
-            setAteAt(toDatetimeLocal(exifData.timestamp))
-          }
-          setExifData(exifData)
-          if (onPhotoSelected) onPhotoSelected(file, exifData?.orientation)
-        }}
-        onClear={() => {
-          setPhotoFile(null)
-          if (onPhotoClear) onPhotoClear()
-        }}
+        photos={photos ?? []}
+        onFilesAdded={onFilesAdded}
+        onPhotoRemoved={onPhotoRemoved}
+        isProcessing={processing}
+        processingError={processingError}
       />
-      {(analysis?.status === 'uploading' || analysis?.status === 'analyzing') && (
-        <p className="text-xs text-stone-400 mt-1">Analyzing photo...</p>
+      {analysis?.status === 'analyzing' && (
+        <p className="text-xs text-stone-400 mt-1">
+          {analysis?.uploadResults?.length > 0
+            ? `Analyzing ${analysis.uploadResults.length} photos...`
+            : 'Analyzing photos...'}
+        </p>
       )}
       {analysis?.error === 'resize_failed' && (
         <p className="text-xs text-red-500 mt-1">
@@ -254,7 +261,7 @@ function EntryForm({ initialData, onSubmit, submitLabel, analysis, onPhotoSelect
             value={venueName}
             onChange={setVenueName}
             onPlaceSelect={(place) => setPlaceId(place?.id || place?.google_place_id || null)}
-            coords={exifData?.lat ? { lat: exifData.lat, lng: exifData.lng } : null}
+            coords={primaryExif?.lat ? { lat: primaryExif.lat, lng: primaryExif.lng } : null}
           />
         </div>
       )}
