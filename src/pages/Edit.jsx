@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getEntry, updateEntry } from '../lib/entries'
-import { deletePhoto } from '../lib/storage'
 import { useMultiPhotoAnalysis } from '../hooks/useMultiPhotoAnalysis'
 import PageShell from '../components/PageShell'
 import EntryForm from '../components/EntryForm'
@@ -12,9 +11,7 @@ function Edit() {
   const [entry, setEntry] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [existingPhotos, setExistingPhotos] = useState([])
-  const [photoIdsToRemove, setPhotoIdsToRemove] = useState([])
-  const { analysis, analyzePhotos, clearAnalysis, claimUploads } = useMultiPhotoAnalysis()
+  const { photos, processing, processingError, analysis, addFiles, removePhoto, clearAll, seedExistingPhotos, claimUploads } = useMultiPhotoAnalysis()
 
   useEffect(() => {
     async function fetchEntry() {
@@ -23,33 +20,45 @@ function Edit() {
         setError(error.message)
       } else {
         setEntry(data)
-        setExistingPhotos(data?.photos ?? [])
-        setPhotoIdsToRemove([])
       }
       setLoading(false)
     }
     fetchEntry()
   }, [id])
 
-  function handlePhotosSelected(files, exifArray) {
-    analyzePhotos(files, exifArray)
-  }
-
-  function handlePhotoClear() {
-    clearAnalysis()
-  }
+  useEffect(() => {
+    if (entry?.photos?.length && photos.length === 0) {
+      seedExistingPhotos(entry.photos.map(p => ({ url: p.url, path: p.path })))
+    }
+  }, [entry?.id])
 
   async function handleSubmit(formData) {
-    const visibleExistingPhotos = existingPhotos.filter((photo) => !photoIdsToRemove.includes(photo.id))
-    const newPhotos = (analysis?.uploadResults ?? []).map((result) => ({
+    const primaryExif = photos[0]?.exif ?? null
+    const existingPhotos = entry?.photos ?? []
+    const existingPathSet = new Set(existingPhotos.map((photo) => photo.path).filter(Boolean))
+
+    const fallbackResults = photos
+      .filter((photo) => photo.rawFile === null)
+      .map((photo) => existingPhotos.find((existingPhoto) => existingPhoto.url === photo.previewUrl))
+      .filter(Boolean)
+      .map((photo) => ({ url: photo.url, path: photo.path }))
+
+    const currentResults = analysis?.uploadResults?.length > 0
+      ? analysis.uploadResults
+      : fallbackResults
+
+    const currentPathSet = new Set(currentResults.map((result) => result.path).filter(Boolean))
+    const photoIdsToRemove = existingPhotos
+      .filter((photo) => !currentPathSet.has(photo.path))
+      .map((photo) => photo.id)
+
+    const newPhotos = currentResults
+      .filter((result) => !existingPathSet.has(result.path))
+      .map((result) => ({
       url: result.url,
       path: result.path,
     }))
-    const primaryPhoto = visibleExistingPhotos[0] || newPhotos[0] || null
-    const pathsToDelete = existingPhotos
-      .filter((photo) => photoIdsToRemove.includes(photo.id))
-      .map((photo) => photo.path)
-      .filter(Boolean)
+    const primaryPhoto = currentResults[0] || null
 
     const entryData = {
       dish_name: formData.dishName,
@@ -67,8 +76,8 @@ function Edit() {
       cuisine_type: formData.cuisineType || null,
       photo_url: primaryPhoto?.url ?? null,
       photo_path: primaryPhoto?.path ?? null,
-      photo_lat: formData.photoLat,
-      photo_lng: formData.photoLng,
+      photo_lat: primaryExif?.lat ?? null,
+      photo_lng: primaryExif?.lng ?? null,
       place_id: formData.placeId || null,
       ai_suggestions: analysis?.suggestions || null,
     }
@@ -76,8 +85,6 @@ function Edit() {
     const { error } = await updateEntry(id, entryData, newPhotos, photoIdsToRemove)
 
     if (error) throw error
-
-    await Promise.all(pathsToDelete.map((path) => deletePhoto(path)))
     claimUploads()
 
     navigate(`/entry/${id}`)
@@ -103,38 +110,17 @@ function Edit() {
 
   return (
     <PageShell title="Edit entry" backTo={`/entry/${id}`}>
-      {existingPhotos.filter((photo) => !photoIdsToRemove.includes(photo.id)).length > 0 && (
-        <div className="mb-4">
-          <p className="text-xs text-stone-400 mb-2">Existing photos</p>
-          <div className="flex flex-wrap gap-2">
-            {existingPhotos
-              .filter((photo) => !photoIdsToRemove.includes(photo.id))
-              .map((photo) => (
-                <div key={photo.id} className="relative w-16 h-16">
-                  <img src={photo.url} className="w-full h-full object-cover rounded-lg" alt="" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhotoIdsToRemove((prev) => (
-                        prev.includes(photo.id) ? prev : [...prev, photo.id]
-                      ))
-                    }}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
       <EntryForm
         initialData={entry}
         onSubmit={handleSubmit}
         submitLabel="Update entry"
         analysis={analysis}
-        onPhotosSelected={handlePhotosSelected}
-        onPhotoClear={handlePhotoClear}
+        photos={photos}
+        processing={processing}
+        processingError={processingError}
+        onFilesAdded={addFiles}
+        onPhotoRemoved={removePhoto}
+        onPhotoClear={clearAll}
       />
     </PageShell>
   )
