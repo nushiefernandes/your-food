@@ -228,8 +228,8 @@ Deno.serve(async (req) => {
               temperature: 0.2,
               maxOutputTokens: 512,
               responseMimeType: "application/json",
+              thinkingConfig: { thinkingBudget: 0 },
             },
-            thinkingConfig: { thinkingBudget: 0 },
           }),
         },
       )
@@ -251,7 +251,8 @@ Deno.serve(async (req) => {
     }
 
     const geminiJson = await geminiResponse.json()
-    const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text
+    const responseParts = geminiJson?.candidates?.[0]?.content?.parts ?? []
+    const text = responseParts.find((p: { thought?: boolean }) => !p.thought)?.text
     if (typeof text !== "string") {
       console.error("Gemini response missing text")
       return jsonResponse({ suggestions: null, error: "api_error" }, origin)
