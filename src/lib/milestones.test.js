@@ -52,4 +52,42 @@ describe('checkMilestones', () => {
     const result = checkMilestones(makeInsights({ meta: { total_meals: 3 } }), [])
     expect(result).toHaveLength(0)
   })
+
+  // Catches M1: cuisines_5 uses >= not === — exactly 5 would pass both, but 6 only passes >=
+  it('returns cuisines_5 when user has more than 5 cuisines (>= not ===)', () => {
+    const cuisines = ['Italian', 'Indian', 'Japanese', 'Mexican', 'Thai', 'Chinese']
+      .map(c => ({ cuisine: c, count: 1, pct: 16.7 }))
+    const result = checkMilestones(makeInsights({ eating: { cuisine_breakdown: cuisines } }), [])
+    expect(result.some(m => m.id === 'cuisines_5')).toBe(true)
+  })
+
+  // Catches M3: minor milestones (meals_10, meals_25) have confetti: false
+  // — if any were accidentally set to true, celebration fires on routine saves
+  it('marks confetti=false for minor meal-count milestones (10 and 25)', () => {
+    const at10 = checkMilestones(makeInsights({ meta: { total_meals: 10 } }), [])
+    const m10 = at10.find(m => m.id === 'meals_10')
+    expect(m10?.confetti).toBe(false)
+
+    const at25 = checkMilestones(makeInsights({ meta: { total_meals: 25 } }), [])
+    const m25 = at25.find(m => m.id === 'meals_25')
+    expect(m25?.confetti).toBe(false)
+  })
+
+  // Catches M5: meals_100 threshold is exactly 100, not 99
+  it('returns meals_100 at exactly 100 meals, not at 99', () => {
+    const at99 = checkMilestones(makeInsights({ meta: { total_meals: 99 } }), [])
+    expect(at99.some(m => m.id === 'meals_100')).toBe(false)
+
+    const at100 = checkMilestones(makeInsights({ meta: { total_meals: 100 } }), [])
+    expect(at100.some(m => m.id === 'meals_100')).toBe(true)
+  })
+
+  // Catches M6: home_meals_10 uses >= not === — 11 home meals should still trigger
+  it('returns home_meals_10 when home_count exceeds 10 (>= not ===)', () => {
+    const result = checkMilestones(
+      makeInsights({ home_vs_out: { cooking_ratio: { home_count: 11 } } }),
+      []
+    )
+    expect(result.some(m => m.id === 'home_meals_10')).toBe(true)
+  })
 })
