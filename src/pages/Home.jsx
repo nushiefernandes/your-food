@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { getDistinctCuisines, searchEntries } from '../lib/entries'
 import { useFilteredEntries } from '../hooks/useFilteredEntries'
 import { useAuth } from '../contexts/AuthContext'
@@ -26,8 +26,6 @@ function getRandomItem(items) {
 function Home() {
   const { user, signOut } = useAuth()
   const { entries, loading, error, filters, setFilter, clearFilters, resultCount } = useFilteredEntries()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [showToast, setShowToast] = useState(false)
   const [cuisines, setCuisines] = useState([])
   const [hasAnyEntries, setHasAnyEntries] = useState(null)
   const emptyStateHeadline = useMemo(
@@ -73,17 +71,6 @@ function Home() {
   }, [])
 
   useEffect(() => {
-    if (searchParams.get('saved')) {
-      setShowToast(true)
-      const newParams = new URLSearchParams(searchParams)
-      newParams.delete('saved')
-      setSearchParams(newParams, { replace: true })
-      const timer = setTimeout(() => setShowToast(false), 2500)
-      return () => clearTimeout(timer)
-    }
-  }, [searchParams, setSearchParams])
-
-  useEffect(() => {
     if (!loading && !error && !hasActiveFilters) {
       setHasAnyEntries(entries.length > 0)
     }
@@ -117,12 +104,6 @@ function Home() {
         >
           + Log a meal
         </Link>
-
-        {showToast && (
-          <div className="mt-4 bg-green-50 border border-green-200 text-green-700 text-sm font-medium px-4 py-2 rounded-lg text-center transition-opacity duration-500">
-            Meal saved!
-          </div>
-        )}
 
         <div className="mt-4 space-y-3">
           <SearchBar
