@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.js', 'src/e2e/**/*.test.js'],
+    include: ['src/**/*.test.js', 'src/**/*.test.jsx', 'src/e2e/**/*.test.js'],
     clearMocks: true,
     restoreMocks: true,
     mockReset: true,
