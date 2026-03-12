@@ -67,6 +67,13 @@ function EntryForm({
   const [aiVisible, setAiVisible] = useState(new Set())
   const aiVisibleRef = useRef(new Set())
   useEffect(() => { aiVisibleRef.current = aiVisible }, [aiVisible])
+  useEffect(() => {
+    const ts = photos?.[0]?.exif?.timestamp
+    if (ts && !ateAtTouched) {
+      setAteAt(toDatetimeLocal(ts))
+      setAteAtTouched(true)
+    }
+  }, [photos?.[0]?.exif?.timestamp])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const primaryExif = photos?.[0]?.exif ?? null
