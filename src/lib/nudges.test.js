@@ -71,4 +71,46 @@ describe('selectNudge', () => {
     expect(() => selectNudge({ rating: 3 }, null)).not.toThrow()
     expect(selectNudge({ rating: 3 }, null)).toBeNull()
   })
+
+  // Catches M2: companion check reads entry.companions (not entry.companion or entry.companionPresent)
+  // — if field name is wrong, this entry returns null instead of companion nudge
+  it('returns companion nudge when entry has companions and user mostly eats solo', () => {
+    const entry = { companions: ['Alice'] }
+    const result = selectNudge(entry, baseInsights) // solo_pct: 80 > 70 threshold
+    expect(result?.id).toBe('companion')
+    expect(result?.text).toBeTruthy()
+  })
+
+  // Catches M3: cooking_streak check uses entry_type === 'home' (lowercase)
+  // — if check used 'Home' instead, this entry would return null
+  it('returns cooking_streak nudge for home-cooked meal when streak >= 3', () => {
+    const entry = { entry_type: 'home' }
+    const result = selectNudge(entry, baseInsights) // streak current: 4
+    expect(result?.id).toBe('cooking_streak')
+    expect(result?.text).toContain('4')
+  })
+
+  // Catches M7a: spending nudge fires when cost < 50% of average (not when cost > average)
+  // — if < was flipped to >, cheap meals would get no nudge and expensive ones would get "cheap" text
+  it('returns spending nudge when meal costs less than half the user average', () => {
+    const entry = { cost: 100 } // avg is 300, threshold is 150
+    const result = selectNudge(entry, baseInsights)
+    expect(result?.id).toBe('spending')
+    expect(result?.text).toMatch(/less than your usual/i)
+  })
+
+  // Catches M7b: spending nudge fires when cost > 2x average (not when cost < average)
+  it('returns spending nudge when meal costs more than double the user average', () => {
+    const entry = { cost: 700 } // avg is 300, threshold is 600
+    const result = selectNudge(entry, baseInsights)
+    expect(result?.id).toBe('spending')
+    expect(result?.text).toMatch(/splurge/i)
+  })
+
+  // Catches M7c: spending nudge does NOT fire for an average-cost meal
+  it('does not return spending nudge when cost is near the user average', () => {
+    const entry = { cost: 300 } // exactly average — neither threshold triggers
+    const result = selectNudge(entry, baseInsights)
+    expect(result?.id).not.toBe('spending')
+  })
 })
