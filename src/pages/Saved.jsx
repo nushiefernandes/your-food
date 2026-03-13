@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getInsights } from '../lib/insights'
 import { selectNudge } from '../lib/nudges'
@@ -47,6 +47,7 @@ function Saved() {
   const [milestones, setMilestones] = useState([])
   const [showConfetti, setShowConfetti] = useState(false)
   const [insightsReady, setInsightsReady] = useState(false)
+  const loadedRef = useRef(false)
 
   useEffect(() => {
     const timer = setTimeout(() => navigate(returnTo, { replace: true }), REDIRECT_DELAY)
@@ -54,6 +55,8 @@ function Saved() {
   }, [navigate, returnTo])
 
   useEffect(() => {
+    if (loadedRef.current) return
+    loadedRef.current = true
     async function load() {
       const { data, error } = await getInsights()
       if (error || !data) { setInsightsReady(true); return }
@@ -77,7 +80,10 @@ function Saved() {
       if (newMilestones.length > 0) {
         const { error: insertError } = await supabase
           .from('milestones_seen')
-          .insert(newMilestones.map(m => ({ milestone: m.id })))
+          .upsert(
+            newMilestones.map(m => ({ milestone: m.id })),
+            { onConflict: 'user_id,milestone', ignoreDuplicates: true }
+          )
         if (!insertError) {
           setMilestones(newMilestones)
           if (newMilestones.some(m => m.confetti)) setShowConfetti(true)
