@@ -94,7 +94,7 @@ function Add() {
       fetchWeatherAndNeighbourhood(entry.id, primaryLat, primaryLng, formData.ateAt)
     }
 
-    navigate(`/saved/${entry.id}`)
+    navigate(`/saved/${entry.id}`, { state: { entry } })
   }
 
   return (

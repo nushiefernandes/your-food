@@ -44,6 +44,11 @@ function Saved() {
   const navigate = useNavigate()
   const returnTo = location.state?.returnTo || '/'
 
+  // Happy path: entry already in state (just came from Add/Edit) — no DB fetch needed.
+  // Refresh path: state is gone, fetch from DB using URL param.
+  const [entry, setEntry] = useState(location.state?.entry || null)
+  const [entryReady, setEntryReady] = useState(Boolean(location.state?.entry))
+
   const [nudge, setNudge] = useState(null)
   const [milestones, setMilestones] = useState([])
   const [showConfetti, setShowConfetti] = useState(false)
@@ -55,20 +60,34 @@ function Saved() {
     return () => clearTimeout(timer)
   }, [navigate, returnTo])
 
+  // Fetch entry only when state didn't provide one (refresh case).
   useEffect(() => {
-    if (loadedRef.current) return
-    loadedRef.current = true
+    if (entry) { setEntryReady(true); return }
+    if (!entryId) { setEntryReady(true); return }
 
-    async function load() {
-      // Step 1: fetch entry from DB (refresh-safe)
-      const { data: entry, error: entryError } = await getEntry(entryId)
-      if (entryError || !entry) {
+    let cancelled = false
+    async function loadEntry() {
+      const { data, error: entryError } = await getEntry(entryId)
+      if (cancelled) return
+      if (entryError || !data) {
         console.error('Saved: failed to fetch entry', entryId, entryError)
         navigate(returnTo, { replace: true })
         return
       }
+      setEntry(data)
+      setEntryReady(true)
+    }
+    loadEntry()
+    return () => { cancelled = true }
+  }, [entryId])
 
-      // Step 2: fetch insights
+  // Run insights/nudge/milestones once entry is ready.
+  useEffect(() => {
+    if (!entryReady || loadedRef.current) return
+    loadedRef.current = true
+
+    async function load() {
+      // Step 1: fetch insights
       const { data: insightsData, error: insightsError } = await getInsights()
       if (insightsError || !insightsData) {
         console.error('Saved: failed to fetch insights', insightsError)
@@ -78,7 +97,7 @@ function Saved() {
 
       const insights = insightsData.insights
 
-      // Step 3: nudge
+      // Step 2: nudge
       let lastNudgeId = null
       try { lastNudgeId = sessionStorage.getItem('last_nudge_id') } catch {}
       const picked = selectNudge(entry, insights, lastNudgeId)
@@ -87,7 +106,7 @@ function Saved() {
         setNudge(picked.text)
       }
 
-      // Step 4: milestones
+      // Step 3: milestones
       const { data: seen, error: seenError } = await supabase
         .from('milestones_seen')
         .select('milestone')
@@ -115,7 +134,7 @@ function Saved() {
     }
 
     load()
-  }, [entryId])
+  }, [entry, entryReady])
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center">
