@@ -59,7 +59,7 @@ export const NUDGE_TEMPLATES = [
     id: 'spending',
     check: (entry, insights) => {
       const avg = insights?.spending?.avg_meal_cost
-      if (!avg || !entry?.cost || entry.cost <= 0) return null
+      if (!avg || entry?.cost == null) return null
       if (entry.cost < avg * 0.5) return `Nice find — this one cost way less than your usual.`
       if (entry.cost > avg * 2) return `A splurge — treating yourself?`
       return null
