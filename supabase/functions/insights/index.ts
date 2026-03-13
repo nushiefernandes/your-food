@@ -8,7 +8,7 @@ const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") || "")
 if (ALLOWED_ORIGINS.length === 0) ALLOWED_ORIGINS.push("*")
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || ""
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || ""
 
 type Entry = Record<string, unknown>
 type CountMap = Map<string, number>
@@ -837,19 +837,24 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("authorization") || ""
     const token = authHeader.replace("Bearer ", "")
-    const payload = JSON.parse(atob(token.split(".")[1]))
-    const userId = payload.sub
-
-    if (!userId) {
+    if (!token) {
       return jsonResponse({ insights: null, error: "unauthorized" }, origin, 401)
     }
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       console.error("Missing Supabase environment variables")
       return jsonResponse({ insights: null, error: "api_error" }, origin, 500)
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return jsonResponse({ insights: null, error: "unauthorized" }, origin, 401)
+    }
+    const userId = user.id
 
     const { data, error } = await supabase
       .from('entries')
