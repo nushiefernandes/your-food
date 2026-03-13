@@ -26,7 +26,7 @@ function App() {
           <Route path="/edit/:id" element={
             <ProtectedRoute><Edit /></ProtectedRoute>
           } />
-          <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
+          <Route path="/saved/:entryId" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

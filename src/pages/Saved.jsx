@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getInsights } from '../lib/insights'
+import { getEntry } from '../lib/entries'
 import { selectNudge } from '../lib/nudges'
 import { checkMilestones } from '../lib/milestones'
 import { supabase } from '../lib/supabase'
@@ -38,9 +39,9 @@ function ConfettiOverlay() {
 }
 
 function Saved() {
+  const { entryId } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const entry = location.state?.entry || null
   const returnTo = location.state?.returnTo || '/'
 
   const [nudge, setNudge] = useState(null)
@@ -57,12 +58,27 @@ function Saved() {
   useEffect(() => {
     if (loadedRef.current) return
     loadedRef.current = true
+
     async function load() {
-      const { data, error } = await getInsights()
-      if (error || !data) { setInsightsReady(true); return }
+      // Step 1: fetch entry from DB (refresh-safe)
+      const { data: entry, error: entryError } = await getEntry(entryId)
+      if (entryError || !entry) {
+        console.error('Saved: failed to fetch entry', entryId, entryError)
+        navigate(returnTo, { replace: true })
+        return
+      }
 
-      const insights = data.insights
+      // Step 2: fetch insights
+      const { data: insightsData, error: insightsError } = await getInsights()
+      if (insightsError || !insightsData) {
+        console.error('Saved: failed to fetch insights', insightsError)
+        setInsightsReady(true)
+        return
+      }
 
+      const insights = insightsData.insights
+
+      // Step 3: nudge
       let lastNudgeId = null
       try { lastNudgeId = sessionStorage.getItem('last_nudge_id') } catch {}
       const picked = selectNudge(entry, insights, lastNudgeId)
@@ -71,9 +87,12 @@ function Saved() {
         setNudge(picked.text)
       }
 
-      const { data: seen } = await supabase
+      // Step 4: milestones
+      const { data: seen, error: seenError } = await supabase
         .from('milestones_seen')
         .select('milestone')
+      if (seenError) console.error('Saved: failed to fetch milestones_seen', seenError)
+
       const seenIds = (seen || []).map(r => r.milestone)
       const newMilestones = checkMilestones(insights, seenIds)
 
@@ -84,7 +103,9 @@ function Saved() {
             newMilestones.map(m => ({ milestone: m.id })),
             { onConflict: 'user_id,milestone', ignoreDuplicates: true }
           )
-        if (!insertError) {
+        if (insertError) {
+          console.error('Saved: failed to upsert milestones', insertError)
+        } else {
           setMilestones(newMilestones)
           if (newMilestones.some(m => m.confetti)) setShowConfetti(true)
         }
@@ -92,8 +113,9 @@ function Saved() {
 
       setInsightsReady(true)
     }
+
     load()
-  }, [entry])
+  }, [entryId])
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center">

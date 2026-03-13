@@ -87,7 +87,7 @@ function Edit() {
     if (error) throw error
     claimUploads()
 
-    navigate('/saved', { state: { returnTo: `/entry/${id}` } })
+    navigate(`/saved/${id}`, { state: { returnTo: `/entry/${id}` } })
   }
 
   if (loading) {
