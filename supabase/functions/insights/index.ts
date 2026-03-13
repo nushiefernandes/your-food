@@ -1,12 +1,11 @@
 import "@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const IS_DEV = Deno.env.get("ENV") === "development"
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean)
-if (IS_DEV) ALLOWED_ORIGINS.push("*")
+if (ALLOWED_ORIGINS.length === 0) ALLOWED_ORIGINS.push("*")
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || ""
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
