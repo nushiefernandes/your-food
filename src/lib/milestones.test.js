@@ -25,13 +25,23 @@ describe('checkMilestones', () => {
     expect(result.some(m => m.id === 'meals_10')).toBe(true)
   })
 
-  it('does not return meals_10 at 11 meals (threshold is exact)', () => {
+  it('returns meals_10 at 11 meals', () => {
     const result = checkMilestones(makeInsights({ meta: { total_meals: 11 } }), [])
+    expect(result.some(m => m.id === 'meals_10')).toBe(true)
+  })
+
+  it('does not return meals_10 at 11 meals when already seen', () => {
+    const result = checkMilestones(makeInsights({ meta: { total_meals: 11 } }), ['meals_10'])
     expect(result.some(m => m.id === 'meals_10')).toBe(false)
   })
 
   it('returns streak_7 at current streak of exactly 7', () => {
     const result = checkMilestones(makeInsights({ timing: { logging_streak: { current: 7, longest: 7 } } }), [])
+    expect(result.some(m => m.id === 'streak_7')).toBe(true)
+  })
+
+  it('returns streak_7 at current streak of 8', () => {
+    const result = checkMilestones(makeInsights({ timing: { logging_streak: { current: 8, longest: 8 } } }), [])
     expect(result.some(m => m.id === 'streak_7')).toBe(true)
   })
 
@@ -89,5 +99,38 @@ describe('checkMilestones', () => {
       []
     )
     expect(result.some(m => m.id === 'home_meals_10')).toBe(true)
+  })
+
+  // Catches M1 bug: null overrides default param — null.includes() throws TypeError
+  // Fix: seenIds ?? [] inside function body handles explicit null
+  it('does not throw when seenIds is null', () => {
+    expect(() => checkMilestones(makeInsights(), null)).not.toThrow()
+  })
+
+  // Cascading milestones: all 4 count milestones fire simultaneously at 100 meals
+  // This is intentional — seenIds prevents re-showing on subsequent saves
+  it('fires all count milestones simultaneously when total_meals reaches 100', () => {
+    const result = checkMilestones(makeInsights({ meta: { total_meals: 100 } }), [])
+    expect(result.some(m => m.id === 'meals_10')).toBe(true)
+    expect(result.some(m => m.id === 'meals_25')).toBe(true)
+    expect(result.some(m => m.id === 'meals_50')).toBe(true)
+    expect(result.some(m => m.id === 'meals_100')).toBe(true)
+  })
+
+  // Cascading streaks: both streak milestones fire simultaneously at streak=31
+  it('fires both streak milestones simultaneously when streak exceeds 30', () => {
+    const result = checkMilestones(
+      makeInsights({ timing: { logging_streak: { current: 31, longest: 31 } } }),
+      []
+    )
+    expect(result.some(m => m.id === 'streak_7')).toBe(true)
+    expect(result.some(m => m.id === 'streak_30')).toBe(true)
+  })
+
+  // Dedup: all milestones in seenIds → nothing fires
+  it('returns empty array when every milestone has already been seen', () => {
+    const allIds = MILESTONES.map(m => m.id)
+    const result = checkMilestones(makeInsights({ meta: { total_meals: 100 } }), allIds)
+    expect(result).toHaveLength(0)
   })
 })
