@@ -66,10 +66,60 @@ export const NUDGE_TEMPLATES = [
     },
   },
   {
+    id: 'go_to_dish',
+    check: (entry, insights) => {
+      if (!entry?.dish_name) return null
+      const match = (insights?.eating?.top_dishes || [])
+        .find(d => d.name?.toLowerCase() === entry.dish_name?.toLowerCase())
+      if (match?.count >= 3) return `${entry.dish_name} is officially one of your go-tos — you keep finding your way back to it.`
+      return null
+    },
+  },
+  {
+    id: 'companion_repeat',
+    check: (entry, insights) => {
+      if (!entry?.companions) return null
+      const raw = entry.companions
+      const names = Array.isArray(raw)
+        ? raw.map(s => String(s).trim().toLowerCase())
+        : String(raw).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      const match = (insights?.social?.top_companions || [])
+        .find(c => names.includes(c.name?.toLowerCase()) && c.count >= 3)
+      if (match) return `${match.name} is becoming one of your favourite people to share a meal with. 🥘`
+      return null
+    },
+  },
+  {
     id: 'companion',
     check: (entry, insights) => {
       if (!entry?.companions) return null
       if ((insights?.social?.solo_pct || 0) > 70) return `Nice to have company for a change! 👥`
+      return null
+    },
+  },
+  {
+    id: 'dish_revisit',
+    check: (entry, insights) => {
+      if (!entry?.dish_name) return null
+      const topDish = (insights?.eating?.top_dishes || [])
+        .find(d => d.name?.toLowerCase() === entry.dish_name?.toLowerCase())
+      if (!topDish || topDish.count < 2) return null
+      const revisit = (insights?.meta?.dishes_to_revisit || [])
+        .find(d => d.dish?.toLowerCase() === entry.dish_name?.toLowerCase())
+      if (revisit) return `Back to ${entry.dish_name} after loving it last time — hope it delivers! ⭐`
+      return null
+    },
+  },
+  {
+    id: 'home_beats_out',
+    check: (entry, insights) => {
+      if (entry?.entry_type !== 'home') return null
+      const comp = insights?.home_vs_out?.avg_rating_comparison
+      const ratio = insights?.home_vs_out?.cooking_ratio
+      if (!comp?.home || !comp?.out) return null
+      if ((ratio?.home_count || 0) < 5 || (ratio?.out_count || 0) < 5) return null
+      if (comp.home >= comp.out + 0.5)
+        return `Honestly, your home meals seem to win more often than the ones you go out for.`
       return null
     },
   },
