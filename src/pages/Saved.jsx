@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getInsights } from '../lib/insights'
 import { getEntry } from '../lib/entries'
@@ -53,12 +53,12 @@ function Saved() {
   const [milestones, setMilestones] = useState([])
   const [showConfetti, setShowConfetti] = useState(false)
   const [insightsReady, setInsightsReady] = useState(false)
-  const loadedRef = useRef(false)
 
   useEffect(() => {
+    if (!insightsReady) return
     const timer = setTimeout(() => navigate(returnTo, { replace: true }), REDIRECT_DELAY)
     return () => clearTimeout(timer)
-  }, [navigate, returnTo])
+  }, [insightsReady, navigate, returnTo])
 
   // Fetch entry only when state didn't provide one (refresh case).
   useEffect(() => {
@@ -83,14 +83,17 @@ function Saved() {
 
   // Run insights/nudge/milestones once entry is ready.
   useEffect(() => {
-    if (!entryReady || loadedRef.current) return
-    loadedRef.current = true
+    if (!entryReady) return
+
+    let cancelled = false
 
     async function load() {
       // Step 1: fetch insights
       const { data: insightsData, error: insightsError } = await getInsights()
+      if (cancelled) return
       if (insightsError || !insightsData) {
         console.error('Saved: failed to fetch insights', insightsError)
+        if (cancelled) return
         setInsightsReady(true)
         return
       }
@@ -102,6 +105,7 @@ function Saved() {
       try { lastNudgeId = sessionStorage.getItem('last_nudge_id') } catch {}
       const picked = selectNudge(entry, insights, lastNudgeId)
       if (picked) {
+        if (cancelled) return
         try { sessionStorage.setItem('last_nudge_id', picked.id) } catch {}
         setNudge(picked.text)
       }
@@ -110,6 +114,7 @@ function Saved() {
       const { data: seen, error: seenError } = await supabase
         .from('milestones_seen')
         .select('milestone')
+      if (cancelled) return
       if (seenError) console.error('Saved: failed to fetch milestones_seen', seenError)
 
       const seenIds = (seen || []).map(r => r.milestone)
@@ -122,18 +127,23 @@ function Saved() {
             newMilestones.map(m => ({ milestone: m.id })),
             { onConflict: 'user_id,milestone', ignoreDuplicates: true }
           )
+        if (cancelled) return
         if (insertError) {
           console.error('Saved: failed to upsert milestones', insertError)
         } else {
+          if (cancelled) return
           setMilestones(newMilestones)
+          if (cancelled) return
           if (newMilestones.some(m => m.confetti)) setShowConfetti(true)
         }
       }
 
+      if (cancelled) return
       setInsightsReady(true)
     }
 
     load()
+    return () => { cancelled = true }
   }, [entry, entryReady])
 
   return (
