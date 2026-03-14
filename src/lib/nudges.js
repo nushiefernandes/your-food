@@ -92,7 +92,7 @@ export const NUDGE_TEMPLATES = [
   {
     id: 'companion',
     check: (entry, insights) => {
-      if (!entry?.companions) return null
+      if (!entry?.companions?.length) return null
       if ((insights?.social?.solo_pct || 0) > 70) return `Nice to have company for a change! 👥`
       return null
     },

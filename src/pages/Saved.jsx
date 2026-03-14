@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { getInsights } from '../lib/insights'
-import { getEntry } from '../lib/entries'
 import { selectNudge } from '../lib/nudges'
-import { checkMilestones } from '../lib/milestones'
 import { supabase } from '../lib/supabase'
 
 const REDIRECT_DELAY = 4000
+const MIN_DISPLAY_DELAY = 1500
 const CONFETTI_COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#f97316']
 const CONFETTI_COUNT = 24
 
@@ -44,107 +42,61 @@ function Saved() {
   const navigate = useNavigate()
   const returnTo = location.state?.returnTo || '/'
 
-  // Happy path: entry already in state (just came from Add/Edit) — no DB fetch needed.
-  // Refresh path: state is gone, fetch from DB using URL param.
-  const [entry, setEntry] = useState(location.state?.entry || null)
-  const [entryReady, setEntryReady] = useState(Boolean(location.state?.entry))
-
+  const [status, setStatus] = useState('loading')
   const [nudge, setNudge] = useState(null)
   const [milestones, setMilestones] = useState([])
-  const [showConfetti, setShowConfetti] = useState(false)
-  const [insightsReady, setInsightsReady] = useState(false)
+  const showConfetti = milestones.some(m => m.confetti)
+  const hasNavigated = useRef(false)
+
+  function leave() {
+    if (hasNavigated.current) return
+    hasNavigated.current = true
+    navigate(returnTo, { replace: true })
+  }
 
   useEffect(() => {
-    if (!insightsReady) return
-    const timer = setTimeout(() => navigate(returnTo, { replace: true }), REDIRECT_DELAY)
-    return () => clearTimeout(timer)
-  }, [insightsReady, navigate, returnTo])
+    const t = setTimeout(leave, REDIRECT_DELAY)
+    return () => clearTimeout(t)
+  }, [])
 
-  // Fetch entry only when state didn't provide one (refresh case).
   useEffect(() => {
-    if (entry) { setEntryReady(true); return }
-    if (!entryId) { setEntryReady(true); return }
+    if (status !== 'ready' && status !== 'error') return
+    const t = setTimeout(leave, MIN_DISPLAY_DELAY)
+    return () => clearTimeout(t)
+  }, [status])
 
-    let cancelled = false
-    async function loadEntry() {
-      const { data, error: entryError } = await getEntry(entryId)
-      if (cancelled) return
-      if (entryError || !data) {
-        console.error('Saved: failed to fetch entry', entryId, entryError)
-        navigate(returnTo, { replace: true })
-        return
-      }
-      setEntry(data)
-      setEntryReady(true)
+  useEffect(() => {
+    if (!location.state?.entry) {
+      leave()
+      return
     }
-    loadEntry()
-    return () => { cancelled = true }
-  }, [entryId])
 
-  // Run insights/nudge/milestones once entry is ready.
-  useEffect(() => {
-    if (!entryReady) return
-
-    let cancelled = false
+    const controller = new AbortController()
+    const entryData = location.state.entry
 
     async function load() {
-      // Step 1: fetch insights
-      const { data: insightsData, error: insightsError } = await getInsights()
-      if (cancelled) return
-      if (insightsError || !insightsData) {
-        console.error('Saved: failed to fetch insights', insightsError)
-        if (cancelled) return
-        setInsightsReady(true)
+      const { data, error } = await supabase.functions.invoke('post-save', { body: { entryId } })
+      if (controller.signal.aborted) return
+      if (error || !data) {
+        setStatus('error')
         return
       }
 
-      const insights = insightsData.insights
+      const lastNudgeId = sessionStorage.getItem('last_nudge_id')
+      const picked = selectNudge(entryData, data.insights, lastNudgeId)
+      if (picked) sessionStorage.setItem('last_nudge_id', picked.id)
 
-      // Step 2: nudge
-      let lastNudgeId = null
-      try { lastNudgeId = sessionStorage.getItem('last_nudge_id') } catch {}
-      const picked = selectNudge(entry, insights, lastNudgeId)
-      if (picked) {
-        if (cancelled) return
-        try { sessionStorage.setItem('last_nudge_id', picked.id) } catch {}
-        setNudge(picked.text)
-      }
-
-      // Step 3: milestones
-      const { data: seen, error: seenError } = await supabase
-        .from('milestones_seen')
-        .select('milestone')
-      if (cancelled) return
-      if (seenError) console.error('Saved: failed to fetch milestones_seen', seenError)
-
-      const seenIds = (seen || []).map(r => r.milestone)
-      const newMilestones = checkMilestones(insights, seenIds)
-
-      if (newMilestones.length > 0) {
-        const { error: insertError } = await supabase
-          .from('milestones_seen')
-          .upsert(
-            newMilestones.map(m => ({ milestone: m.id })),
-            { onConflict: 'user_id,milestone', ignoreDuplicates: true }
-          )
-        if (cancelled) return
-        if (insertError) {
-          console.error('Saved: failed to upsert milestones', insertError)
-        } else {
-          if (cancelled) return
-          setMilestones(newMilestones)
-          if (cancelled) return
-          if (newMilestones.some(m => m.confetti)) setShowConfetti(true)
-        }
-      }
-
-      if (cancelled) return
-      setInsightsReady(true)
+      setNudge(picked?.text ?? null)
+      setMilestones(data.newMilestones ?? [])
+      setStatus('ready')
     }
 
-    load()
-    return () => { cancelled = true }
-  }, [entry, entryReady])
+    load().catch(() => {
+      if (!controller.signal.aborted) setStatus('error')
+    })
+
+    return () => controller.abort()
+  }, [entryId])
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center">
@@ -154,21 +106,26 @@ function Saved() {
         <div className="text-5xl mb-4 text-green-600">✓</div>
         <h1 className="text-2xl font-bold text-stone-900 mb-2">Meal saved!</h1>
 
-        {milestones.map(m => (
-          <div
-            key={m.id}
-            className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium px-4 py-3 rounded-lg"
-          >
-            {m.emoji} {m.label}
-          </div>
-        ))}
+        {milestones.length > 0 &&
+          milestones.map(m => (
+            <div
+              key={m.id}
+              className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium px-4 py-3 rounded-lg"
+            >
+              {m.emoji} {m.label}
+            </div>
+          ))}
 
-        {insightsReady && nudge && (
+        {status === 'ready' && nudge && (
           <p className="mt-6 text-stone-500 text-sm leading-relaxed">{nudge}</p>
         )}
 
+        {status === 'loading' && (
+          <p className="mt-6 text-stone-400 text-sm animate-pulse">...</p>
+        )}
+
         <button
-          onClick={() => navigate(returnTo, { replace: true })}
+          onClick={leave}
           className="mt-8 text-sm text-stone-400 hover:text-stone-600 transition-colors"
         >
           Continue →
