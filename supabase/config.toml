@@ -405,3 +405,8 @@ entrypoint = "./functions/places/index.ts"
 verify_jwt = false
 import_map = "./functions/insights/deno.json"
 entrypoint = "./functions/insights/index.ts"
+
+[functions.post-save]
+verify_jwt = false
+import_map = "./functions/post-save/deno.json"
+entrypoint = "./functions/post-save/index.ts"
