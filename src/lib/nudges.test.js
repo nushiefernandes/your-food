@@ -209,4 +209,21 @@ describe('selectNudge', () => {
     const template = NUDGE_TEMPLATES.find(t => t.id === 'home_beats_out')
     expect(template.check(entry, lowDataInsights)).toBeNull()
   })
+
+  // companion: empty array [] is truthy in JS — must NOT fire "Nice to have company!"
+  // Catches bug: !entry?.companions doesn't guard against []
+  it('does not return companion nudge when companions is an empty array', () => {
+    const entry = { companions: [] }
+    const highSoloInsights = { ...baseInsights, social: { ...baseInsights.social, solo_pct: 85 } }
+    const template = NUDGE_TEMPLATES.find(t => t.id === 'companion')
+    expect(template.check(entry, highSoloInsights)).toBeNull()
+  })
+
+  // companion: still fires when companions array has at least one person
+  it('returns companion nudge when companions has entries and user is mostly solo', () => {
+    const entry = { companions: ['Alice'] }
+    const highSoloInsights = { ...baseInsights, social: { ...baseInsights.social, solo_pct: 85 } }
+    const template = NUDGE_TEMPLATES.find(t => t.id === 'companion')
+    expect(template.check(entry, highSoloInsights)).toBeTruthy()
+  })
 })

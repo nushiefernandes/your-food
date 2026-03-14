@@ -3,8 +3,8 @@
 ## Status
 - [x] Phase A: Model aliases updated (index.js) — restart Claude Code to activate
 - [x] Phase B: Opus 4.6 verified plan ✅
-- [ ] **Step 1: milestones.js** — code done by Codex, tests incomplete (see below)
-- [ ] Step 2: nudges.js companion guard
+- [x] Step 1: milestones.js — >= thresholds, null seenIds fix, 18 tests passing
+- [x] Step 2: nudges.js companion guard — 24 tests passing
 - [ ] Step 3: post-save Edge Function
 - [ ] Step 4: Saved.jsx refactor
 - [ ] Step 5: Integration tests
