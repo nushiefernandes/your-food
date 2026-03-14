@@ -402,4 +402,6 @@ import_map = "./functions/places/deno.json"
 entrypoint = "./functions/places/index.ts"
 
 [functions.insights]
-verify_jwt = true
+verify_jwt = false
+import_map = "./functions/insights/deno.json"
+entrypoint = "./functions/insights/index.ts"

@@ -6,6 +6,7 @@ import Home from './pages/Home'
 import Add from './pages/Add'
 import Entry from './pages/Entry'
 import Edit from './pages/Edit'
+import Saved from './pages/Saved'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/edit/:id" element={
             <ProtectedRoute><Edit /></ProtectedRoute>
           } />
+          <Route path="/saved/:entryId" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
