@@ -2,14 +2,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ─── Hoisted mocks (supabase + geo) ──────────────────────────────────────────
-const mockInvoke  = vi.hoisted(() => vi.fn())
-const mockGetUser = vi.hoisted(() => vi.fn())
-const mockFrom    = vi.hoisted(() => vi.fn())
+const mockInvoke     = vi.hoisted(() => vi.fn())
+const mockGetSession = vi.hoisted(() => vi.fn())
+const mockFrom       = vi.hoisted(() => vi.fn())
 
 vi.mock('./supabase', () => ({
   supabase: {
     functions: { invoke: mockInvoke },
-    auth:      { getUser: mockGetUser },
+    auth:      { getSession: mockGetSession },
     from:      mockFrom,
   },
 }))
@@ -103,7 +103,7 @@ describe('savePlace', () => {
   // Catches M2: onConflict: 'google_place_id' → could overwrite another user's record.
   // Deleting this assertion means M2 goes undetected.
   it('uses (user_id, google_place_id) as the conflict target', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetSession.mockResolvedValue({ data: { session: { user: USER } } })
     const chain = makeFromChain({ data: PLACE, error: null })
     mockFrom.mockReturnValue(chain)
 
@@ -118,7 +118,7 @@ describe('savePlace', () => {
   // Catches M3: user_id omitted → RLS rejects the insert, returns null silently.
   // Deleting this assertion means M3 goes undetected.
   it('includes user_id in the upsert payload', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetSession.mockResolvedValue({ data: { session: { user: USER } } })
     const chain = makeFromChain({ data: PLACE, error: null })
     mockFrom.mockReturnValue(chain)
 
@@ -131,7 +131,7 @@ describe('savePlace', () => {
   })
 
   it('returns null without hitting the DB when user is not authenticated', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null } })
+    mockGetSession.mockResolvedValue({ data: { session: null } })
     expect(await savePlace({ google_place_id: 'ChIJtest' })).toBeNull()
     expect(mockFrom).not.toHaveBeenCalled()
   })

@@ -20,7 +20,7 @@ async function invokePlaces(body) {
       return { data: null, error: data?.error || 'api_error' }
     }
 
-    return { data: data ?? null, error: null }
+    return { data, error: null }
   } catch (err) {
     if (err?.name === 'AbortError') {
       return { data: null, error: 'timeout' }
@@ -34,12 +34,12 @@ async function invokePlaces(body) {
 
 export async function searchNearby(lat, lng, radius = 100) {
   const { data } = await invokePlaces({ type: 'nearby', lat, lng, radius })
-  return Array.isArray(data?.places) ? data.places : []
+  return data?.places ?? []
 }
 
 export async function autocompletePlace(input, lat, lng) {
   const { data } = await invokePlaces({ type: 'autocomplete', input, lat, lng })
-  return Array.isArray(data?.predictions) ? data.predictions : []
+  return data?.predictions ?? []
 }
 
 export async function getPlaceDetails(placeId) {
@@ -48,21 +48,23 @@ export async function getPlaceDetails(placeId) {
 }
 
 export async function getSavedPlaces() {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('places')
     .select('*')
     .order('created_at', { ascending: false })
 
+  if (error && import.meta.env.DEV) console.error('[places] getSavedPlaces error:', error)
   return data ?? []
 }
 
 export async function savePlace(placeData) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  // getSession() reads from cache — no network round-trip. RLS enforces actual auth.
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return null
 
   const { data } = await supabase
     .from('places')
-    .upsert({ ...placeData, user_id: user.id }, { onConflict: 'user_id,google_place_id' })
+    .upsert({ ...placeData, user_id: session.user.id }, { onConflict: 'user_id,google_place_id' })
     .select()
     .single()
 
