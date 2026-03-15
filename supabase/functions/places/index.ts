@@ -77,8 +77,10 @@ Deno.serve(async (req) => {
   const start = Date.now()
 
   try {
-    // Auth: Supabase verify_jwt (enabled by default) validates the token at the gateway.
-    // This decode extracts sub for rate-limiting only — not for auth.
+    // Auth: verify_jwt = true in config.toml means the Supabase gateway cryptographically
+    // verifies the JWT signature before this function executes — requests with invalid or
+    // forged tokens are rejected at the gateway and never reach this handler.
+    // The atob decode below extracts sub for per-user rate-limiting only — not for auth.
     const authHeader = req.headers.get("authorization") || ""
     const token = authHeader.replace("Bearer ", "")
     let userId = ""

@@ -397,7 +397,7 @@ entrypoint = "./functions/analyze-dish/index.ts"
 
 [functions.places]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/places/deno.json"
 entrypoint = "./functions/places/index.ts"
 
